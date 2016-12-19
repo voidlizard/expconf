@@ -1,6 +1,7 @@
 #ifndef __example_alloc_h
 #define __example_alloc_h
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 

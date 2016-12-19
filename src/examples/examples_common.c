@@ -23,5 +23,9 @@ bool file_read_char(void *file_, unsigned char *dst) {
 
     *dst = (unsigned char)fgetc(file);
 
+    if( feof(file) ) {
+        return false;
+    }
+
     return true;
 }

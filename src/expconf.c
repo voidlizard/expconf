@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "strchunk.h"
 
@@ -146,6 +147,57 @@ static inline bool __dec_digit( struct expconf_parser *p
     return false;
 }
 
+
+static inline bool __hex_digit( struct expconf_parser *p
+                              , unsigned char c
+                              , int *value ) {
+    switch(c) {
+        case '0' ... '9':
+            if( value ) {
+                *value = (int)(c - '0');
+            }
+            return true;
+
+        case 'a' ... 'f':
+            if( value ) {
+                *value = (int)(10 + c - 'a');
+            }
+            return true;
+
+        case 'A' ... 'F':
+            if( value ) {
+                *value = (int)(10 + c - 'A');
+            }
+            return true;
+
+    }
+
+    return false;
+}
+
+static bool __esc( struct expconf_parser *p
+                 , unsigned char chr
+                 , unsigned char *un
+                 ) {
+
+    switch( chr ) {
+        case '\\':
+            *un = '\\';
+            return true;
+        case 'n':
+            *un = '\n';
+            return true;
+        case 'r':
+            *un = '\r';
+            return true;
+        case 't':
+            *un = '\t';
+            return true;
+    }
+
+    return false;
+}
+
 static inline bool __line_comment_start( struct expconf_parser *p
                                        , unsigned char chr) {
     return chr == '#';
@@ -170,6 +222,23 @@ static inline bool __space( struct expconf_parser *p
     return false;
 }
 
+static inline bool __token_break( struct expconf_parser *p
+                                , unsigned char chr ) {
+
+    if( __space(p, chr) )
+        return true;
+
+    if( __newline(p, chr) )
+        return true;
+
+/*    if( __obrace(p, chr) ) */
+/*        return true;*/
+
+/*    if( __cbrace(p, chr) ) */
+/*        return true;*/
+
+    return false;
+}
 
 static inline void __inc_errors( struct expconf_parser *p ) {
     p->errors++;
@@ -232,14 +301,18 @@ static inline bool __acc_token( struct expconf_parser *p
 
 typedef enum {
     INITIAL
+  , NUM_START
   , DECNUM_START
+  , HEXNUM_START
   , ATOM_START
   , SQ_STRING_START
   , DQ_STRING_START
+  , CHR_ESC
   , COMMENT_START
 } tok_state_t;
 
 struct tok_state {
+    tok_state_t prev;
     tok_state_t state;
     struct strchunk *tok;
     expconf_integer  decnum;
@@ -251,13 +324,36 @@ static inline void __cleanup_state( struct expconf_parser *p
     strchunk_destroy(state->tok, p->allocator, p->dealloc);
 }
 
-static inline void __to_state( struct expconf_parser *p
+
+static inline void __jump_state( struct expconf_parser *p
                              , tok_state_t nstate
                              , struct tok_state *state
                              , unsigned char input
                              ) {
+
+    state->prev = state->state;
     state->state = nstate;
+}
+
+static inline void __call_state( struct expconf_parser *p
+                             , tok_state_t nstate
+                             , struct tok_state *state
+                             , unsigned char input
+                             ) {
+
+    state->prev = state->state;
+    state->state = nstate;
+
     switch( state->state ) {
+
+        case NUM_START:
+            state->decnum =  0;
+            break;
+
+
+        case HEXNUM_START:
+            state->decnum = 0;
+            break;
 
         case DECNUM_START:
             {
@@ -273,6 +369,7 @@ static inline void __to_state( struct expconf_parser *p
             strchunk_destroy(state->tok, p->allocator, p->dealloc);
             state->tok = strchunk_create(p->allocator, p->alloc);
             break;
+
     }
 
     if( state->state == ATOM_START ) {
@@ -289,7 +386,8 @@ void expconf_tokenize( struct expconf_parser *p
 
 
     bool stop = false;
-    struct tok_state state = { .state = INITIAL
+    struct tok_state state = { .prev  = INITIAL
+                             , .state = INITIAL
                              , .tok = 0
                              , .decnum = 0
                              };
@@ -305,27 +403,32 @@ void expconf_tokenize( struct expconf_parser *p
             case INITIAL:
 
                 if( __line_comment_start(p, chr) ) {
-                    __to_state(p, COMMENT_START, &state, chr);
+                    __call_state(p, COMMENT_START, &state, chr);
                     break;
                 }
 
                 if( __atom_start_chr(p, chr) ) {
-                    __to_state(p, ATOM_START, &state, chr);
+                    __call_state(p, ATOM_START, &state, chr);
                     break;
                 }
 
                 if( chr == '\'' ) {
-                    __to_state(p, SQ_STRING_START, &state, chr);
+                    __call_state(p, SQ_STRING_START, &state, chr);
                     break;
                 }
 
                 if( chr == '"' ) {
-                    __to_state(p, DQ_STRING_START, &state, chr);
+                    __call_state(p, DQ_STRING_START, &state, chr);
                     break;
                 }
 
-                if( __dec_digit(p, chr, 0) ) {
-                    __to_state(p, DECNUM_START, &state, chr);
+                if( chr == '0' ) {
+                    __call_state(p, NUM_START, &state, chr);
+                    break;
+                }
+
+                if( __dec_digit(p, chr, 0) && chr != '0' ) {
+                    __call_state(p, DECNUM_START, &state, chr);
                     break;
                 }
 
@@ -335,6 +438,16 @@ void expconf_tokenize( struct expconf_parser *p
 
                 expconf_set_parser_error(p, ERR_TOK_UNKNOWN);
 
+                break;
+
+            case NUM_START:
+
+                if( chr == 'x' || chr == 'X' ) {
+                    __call_state(p, HEXNUM_START, &state, chr);
+                    break;
+                }
+
+                expconf_set_parser_error(p, ERR_TOK_BAD_NUMBER);
                 break;
 
             case DECNUM_START:
@@ -347,9 +460,9 @@ void expconf_tokenize( struct expconf_parser *p
                         break;
                     }
 
-                    if( __newline(p, chr) || __space(p, chr) ) {
+                    if( __token_break(p, chr) ) {
                         __flush_token(p, EXPCONF_TOKEN_INTEGER, (void*)state.decnum, tok_cc, on_token);
-                        __to_state(p, INITIAL, &state, chr);
+                        __call_state(p, INITIAL, &state, chr);
                         break;
                     }
                 }
@@ -358,11 +471,38 @@ void expconf_tokenize( struct expconf_parser *p
 
                 break;
 
+            case HEXNUM_START:
+
+                {
+                    int v = 0;
+                    if( __hex_digit(p, chr, &v) ) {
+                        state.decnum *= 16;
+                        state.decnum += (expconf_integer)v;
+                        break;
+                    }
+
+                    if( __token_break(p, chr) ) {
+                        __flush_token(p, EXPCONF_TOKEN_INTEGER, (void*)state.decnum, tok_cc, on_token);
+                        __call_state(p, INITIAL, &state, chr);
+                        break;
+                    }
+                }
+
+                expconf_set_parser_error(p, ERR_TOK_BAD_NUMBER);
+
+                break;
+
+
             case SQ_STRING_START:
+
+                if( chr == '\\' ) {
+                    __call_state(p, CHR_ESC, &state, chr);
+                    break;
+                }
 
                 if( chr == '\'' ) {
                     __flush_token(p, EXPCONF_TOKEN_STRING, state.tok, tok_cc, on_token);
-                    __to_state(p, INITIAL, &state, chr);
+                    __call_state(p, INITIAL, &state, chr);
                     break;
                 }
 
@@ -374,10 +514,16 @@ void expconf_tokenize( struct expconf_parser *p
 
             case DQ_STRING_START:
 
+
+                if( chr == '\\' ) {
+                    __call_state(p, CHR_ESC, &state, chr);
+                    break;
+                }
+
                 if( chr == '"' ) {
                     // flush token
                     __flush_token(p, EXPCONF_TOKEN_STRING, state.tok, tok_cc, on_token);
-                    __to_state(p, INITIAL, &state, chr);
+                    __call_state(p, INITIAL, &state, chr);
                     break;
                 }
 
@@ -387,16 +533,26 @@ void expconf_tokenize( struct expconf_parser *p
 
                 break;
 
-            case ATOM_START:
-                if( __newline(p, chr) ) {
-                    __flush_token(p, EXPCONF_TOKEN_ATOM, state.tok, tok_cc, on_token);
-                    __to_state(p, INITIAL, &state, chr);
-                    break;
-                }
+            case CHR_ESC:
+                {
+                    unsigned char unesc = 0;
 
-                if( __space(p, chr) ) {
+                    if( __esc(p, chr, &unesc) ) {
+                        if( !__acc_string(p, state.tok, unesc) ) {
+                            expconf_set_parser_error(p, ERR_TOK_STRING_TOO_LARGE);
+                            break;
+                        }
+                        __jump_state(p, state.prev, &state, chr);
+                        break;
+                    }
+                }
+                expconf_set_parser_error(p, ERR_TOK_BAD_STRING);
+                break;
+
+            case ATOM_START:
+                if( __token_break(p, chr) ) {
                     __flush_token(p, EXPCONF_TOKEN_ATOM, state.tok, tok_cc, on_token);
-                    __to_state(p, INITIAL, &state, chr);
+                    __call_state(p, INITIAL, &state, chr);
                     break;
                 }
 
@@ -413,7 +569,7 @@ void expconf_tokenize( struct expconf_parser *p
 
             case COMMENT_START:
                 if( __newline(p, chr) ) {
-                    __to_state(p, INITIAL, &state, chr);
+                    __call_state(p, INITIAL, &state, chr);
                     break;
                 }
                 break;

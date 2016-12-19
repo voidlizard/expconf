@@ -19,7 +19,7 @@ int main(int argc, char *argv[]) {
                                                          , example_dealloc );
     assert( parser );
 
-    FILE *file = fopen(fname, "r");
+    FILE *file = fopen(fname, "rb");
 
     if( !file ) {
         fprintf(stderr, "*** fatal. %s: %s \n", fname, strerror(errno));
@@ -32,11 +32,15 @@ int main(int argc, char *argv[]) {
                     , 0
                     , debug_dump_token );
 
+    fprintf(stdout, "parse errors: %ld\n"
+                  ,  expconf_parser_error_num(parser)
+           );
+
 __exit:
 
     expconf_parser_destroy(&parser);
     fclose(file);
 
-    return 1;
+    return 0;
 }
 

@@ -11,7 +11,7 @@ typedef bool   (*read_char_t)(void*, unsigned char *);
 
 // FIXME: move to header
 
-#define EXPCONF_LIM_MAX_ATOM 512
+#define EXPCONF_LIM_MAX_ATOM 256
 
 typedef size_t expconf_integer;
 
@@ -20,6 +20,7 @@ typedef enum {
    , ERR_TOK_UNKNOWN
    , ERR_TOK_BAD_ATOM
    , ERR_TOK_BAD_NUMBER
+   , ERR_TOK_BAD_STRING
    , ERR_TOK_STRING_TOO_LARGE
 } expconf_parser_error;
 
