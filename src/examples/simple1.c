@@ -24,6 +24,7 @@ typedef enum {
    , ERR_TOK_UNKNOWN
    , ERR_TOK_BAD_ATOM
    , ERR_TOK_BAD_NUMBER
+   , ERR_TOK_STRING_TOO_LARGE
 } expconf_parser_error;
 
 struct expconf;
@@ -218,6 +219,21 @@ size_t strchunk_length( struct strchunk *chunk_ ) {
     return len;
 }
 
+void strchunk_cstr(struct strchunk *chunk, unsigned char *dst, size_t len) {
+    unsigned char *dp = dst;
+    unsigned char *de = &dst[len-1];
+
+    for(; dp < de && chunk; chunk = chunk->next ) {
+        unsigned char *p = chunk->sdata;
+        unsigned char *pe = chunk->sp;
+        for(; p < pe && dp < de; p++, dp++ ) {
+            *dp = *p;
+        }
+    }
+
+    *dp = 0;
+}
+
 bool strchunk_append_char( struct strchunk *chunk_
                          , unsigned char c
                          , void *allocator
@@ -314,10 +330,6 @@ static inline void __inc_errors( struct expconf_parser *p ) {
     p->errors++;
 }
 
-static inline bool __error_invalid_atom( struct expconf_parser *p) {
-    expconf_set_parser_error(p, ERR_TOK_BAD_ATOM);
-}
-
 void expconf_set_parser_error( struct expconf_parser *p, expconf_parser_error err) {
     __inc_errors(p);
 }
@@ -332,15 +344,17 @@ static inline void __flush_token( struct expconf_parser *p
     switch( tag ) {
         case EXPCONF_TOKEN_INTEGER:
             {
-                struct expconf_token token = { .tag = EXPCONF_TOKEN_INTEGER
+                struct expconf_token token = { .tag = tag
                                              , .val.ei = (expconf_integer)tok_
                                              };
                 on_token(tok_cc, &token);
             }
             break;
+
+        case EXPCONF_TOKEN_STRING:
         case EXPCONF_TOKEN_ATOM:
             {
-                struct expconf_token token = { .tag = EXPCONF_TOKEN_ATOM
+                struct expconf_token token = { .tag = tag
                                              , .val.chunk = tok_
                                              };
                 on_token(tok_cc, &token);
@@ -348,6 +362,13 @@ static inline void __flush_token( struct expconf_parser *p
             break;
     }
 
+}
+
+static inline bool __acc_string( struct expconf_parser *p
+                               , struct strchunk *tok
+                               , unsigned char c ) {
+
+    return strchunk_append_char(tok, c, p->allocator, p->alloc);
 }
 
 static inline bool __acc_token( struct expconf_parser *p
@@ -406,8 +427,11 @@ static inline void __to_state( struct expconf_parser *p
         case SQ_STRING_START:
             strchunk_destroy(state->tok, p->allocator, p->dealloc);
             state->tok = strchunk_create(p->allocator, p->alloc);
-            strchunk_append_char(state->tok, input, p->allocator, p->alloc);
             break;
+    }
+
+    if( state->state == ATOM_START ) {
+        strchunk_append_char(state->tok, input, p->allocator, p->alloc);
     }
 }
 
@@ -492,9 +516,13 @@ void expconf_tokenize( struct expconf_parser *p
             case SQ_STRING_START:
 
                 if( chr == '\'' ) {
+                    __flush_token(p, EXPCONF_TOKEN_STRING, state.tok, tok_cc, on_token);
                     __to_state(p, INITIAL, &state, chr);
-                    // flush token
                     break;
+                }
+
+                if( !__acc_string(p, state.tok, chr) ) {
+                    expconf_set_parser_error(p, ERR_TOK_STRING_TOO_LARGE);
                 }
 
                 break;
@@ -503,8 +531,13 @@ void expconf_tokenize( struct expconf_parser *p
 
                 if( chr == '"' ) {
                     // flush token
+                    __flush_token(p, EXPCONF_TOKEN_STRING, state.tok, tok_cc, on_token);
                     __to_state(p, INITIAL, &state, chr);
                     break;
+                }
+
+                if( !__acc_string(p, state.tok, chr) ) {
+                    expconf_set_parser_error(p, ERR_TOK_STRING_TOO_LARGE);
                 }
 
                 break;
@@ -525,13 +558,12 @@ void expconf_tokenize( struct expconf_parser *p
                 if( __atom_chr(p, chr) ) {
                     // acc token
                     if( !__acc_token(p, state.tok, chr) ) {
-                        __error_invalid_atom(p);
+                        expconf_set_parser_error(p, ERR_TOK_BAD_ATOM);
                     }
                     break;
                 }
 
-                // ERROR!
-                __error_invalid_atom(p);
+                expconf_set_parser_error(p, ERR_TOK_BAD_ATOM);
                 break;
 
             case COMMENT_START:
@@ -637,6 +669,23 @@ static void __dump_token(void *cc, struct expconf_token *token) {
                               , expconf_token_tag_str(token->tag)
                               , len
                               , tok->sdata
+                              );
+            }
+            break;
+        case EXPCONF_TOKEN_STRING:
+            {
+                struct strchunk *tok = token->val.chunk;
+                const size_t len = strchunk_length(tok);
+
+                char tmp[128] = { 0 };
+                const size_t ltmp = sizeof(tmp) - 1;
+
+                strchunk_cstr(token->val.chunk, tmp, ltmp);
+                fprintf(stderr, "%s(%ld) '%s%s'\n"
+                              , expconf_token_tag_str(token->tag)
+                              , len
+                              , tmp
+                              , len < ltmp ? "" : ".."
                               );
             }
             break;
