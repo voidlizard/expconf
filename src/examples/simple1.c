@@ -89,7 +89,7 @@ struct expconf_token {
     expconf_token_tag tag;
     union {
         expconf_integer ei;
-        void *data;
+        struct strchunk *chunk;
     } val;
 };
 
@@ -159,6 +159,7 @@ inline size_t strchunk_used( struct strchunk *s ) {
 struct strchunk * strchunk_create( void *allocator
                                  , alloc_function_t alloc
                                  ) {
+
     const size_t chunksize = 4096;
     const size_t ssize = sizeof(struct strchunk);
 
@@ -168,7 +169,7 @@ struct strchunk * strchunk_create( void *allocator
         return 0;
     }
 
-    memset(s, 0, sizeof(struct strchunk));
+    memset(s, 0, chunksize);
 
     s->sp = &s->sdata[0];
 
@@ -296,12 +297,22 @@ static inline bool __error_invalid_atom( struct expconf_parser *p) {
 
 static inline void __flush_token( struct expconf_parser *p
                                 , expconf_token_tag tag
-                                , struct strchunk *tok
+                                , void *tok_
                                 , void *tok_cc
                                 , on_token_t on_token ) {
 
-    size_t len = strchunk_length(tok);
-    fprintf(stderr, "%s(%ld)\n", expconf_token_tag_str(tag), len);
+
+    switch( tag ) {
+        case EXPCONF_TOKEN_ATOM:
+            {
+                struct expconf_token token = { .tag = EXPCONF_TOKEN_ATOM
+                                             , .val.chunk = tok_
+                                             };
+                on_token(tok_cc, &token);
+            }
+            break;
+    }
+
 }
 
 static inline bool __acc_token( struct expconf_parser *p
@@ -511,7 +522,7 @@ bool char_reader_ss_read(void *cc, unsigned char *dst) {
     return true;
 }
 
-unsigned char *test1[] = { "# expcong file example"
+unsigned char *test1[] = { "# expconf file example"
                          , "# comment line"
                          , "do-nothing 'string-literal' 123456"
                          , "echo atom ### commented part of string"
@@ -520,6 +531,21 @@ unsigned char *test1[] = { "# expcong file example"
                          , 0
                          };
 
+static void __dump_token(void *cc, struct expconf_token *token) {
+    switch( token->tag ) {
+        case EXPCONF_TOKEN_ATOM:
+            {
+                struct strchunk *tok = token->val.chunk;
+                const size_t len = strchunk_length(tok);
+                fprintf(stderr, "%s(%ld) %s\n"
+                              , expconf_token_tag_str(token->tag)
+                              , len
+                              , tok->sdata
+                              );
+            }
+            break;
+    }
+}
 
 int main(int argc, char **argv) {
 
@@ -548,12 +574,12 @@ int main(int argc, char **argv) {
 /*                );*/
 
 
-    struct char_reader_ss ssreader;
+    struct char_reader_ss ssreader = { 0 };
     expconf_tokenize( parser
                     , char_reader_ss_create(&ssreader, test1)
                     , char_reader_ss_read
                     , 0
-                    , 0 );
+                    , __dump_token );
 
     fprintf(stdout, "parse errors: %ld\n"
                   , parser->errors
