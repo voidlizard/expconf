@@ -23,6 +23,7 @@ typedef enum {
      ERR_NO_ERROR
    , ERR_TOK_UNKNOWN
    , ERR_TOK_BAD_ATOM
+   , ERR_TOK_BAD_NUMBER
 } expconf_parser_error;
 
 struct expconf;
@@ -329,6 +330,14 @@ static inline void __flush_token( struct expconf_parser *p
 
 
     switch( tag ) {
+        case EXPCONF_TOKEN_INTEGER:
+            {
+                struct expconf_token token = { .tag = EXPCONF_TOKEN_INTEGER
+                                             , .val.ei = (expconf_integer)tok_
+                                             };
+                on_token(tok_cc, &token);
+            }
+            break;
         case EXPCONF_TOKEN_ATOM:
             {
                 struct expconf_token token = { .tag = EXPCONF_TOKEN_ATOM
@@ -364,18 +373,41 @@ typedef enum {
   , COMMENT_START
 } tok_state_t;
 
+struct tok_state {
+    tok_state_t state;
+    struct strchunk *tok;
+    expconf_integer  decnum;
+};
+
+static inline void __cleanup_state( struct expconf_parser *p
+                                  , struct tok_state *state ) {
+
+    strchunk_destroy(state->tok, p->allocator, p->dealloc);
+}
 
 static inline void __to_state( struct expconf_parser *p
                              , tok_state_t nstate
-                             , tok_state_t *state
-                             , struct strchunk **acc
+                             , struct tok_state *state
                              , unsigned char input
                              ) {
-    *state = nstate;
-    if( acc ) {
-        strchunk_destroy(*acc, p->allocator, p->dealloc);
-        *acc = strchunk_create(p->allocator, p->alloc);
-        strchunk_append_char(*acc, input, p->allocator, p->alloc);
+    state->state = nstate;
+    switch( state->state ) {
+
+        case DECNUM_START:
+            {
+                int v = 0;
+                __dec_digit(p, input, &v);
+                state->decnum = v;
+            }
+            break;
+
+        case ATOM_START:
+        case DQ_STRING_START:
+        case SQ_STRING_START:
+            strchunk_destroy(state->tok, p->allocator, p->dealloc);
+            state->tok = strchunk_create(p->allocator, p->alloc);
+            strchunk_append_char(state->tok, input, p->allocator, p->alloc);
+            break;
     }
 }
 
@@ -388,9 +420,10 @@ void expconf_tokenize( struct expconf_parser *p
 
 
     bool stop = false;
-    tok_state_t state = INITIAL;
-
-    struct strchunk *tok = 0;
+    struct tok_state state = { .state = INITIAL
+                             , .tok = 0
+                             , .decnum = 0
+                             };
 
     unsigned char chr = 0;
     for(; readfn(reader, &chr) && expconf_parser_ok(p); ) {
@@ -399,35 +432,31 @@ void expconf_tokenize( struct expconf_parser *p
             expconf_parser_line_inc(p);
         }
 
-        switch( state ) {
+        switch( state.state ) {
             case INITIAL:
 
                 if( __line_comment_start(p, chr) ) {
-                    __to_state(p, COMMENT_START, &state, 0, chr);
+                    __to_state(p, COMMENT_START, &state, chr);
                     break;
                 }
 
                 if( __atom_start_chr(p, chr) ) {
-                    __to_state( p
-                              , ATOM_START
-                              , &state
-                              , &tok
-                              , chr );
+                    __to_state(p, ATOM_START, &state, chr);
                     break;
                 }
 
                 if( chr == '\'' ) {
-                    __to_state(p, SQ_STRING_START, &state, 0, chr);
+                    __to_state(p, SQ_STRING_START, &state, chr);
                     break;
                 }
 
                 if( chr == '"' ) {
-                    __to_state(p, DQ_STRING_START, &state, &tok, chr);
+                    __to_state(p, DQ_STRING_START, &state, chr);
                     break;
                 }
 
                 if( __dec_digit(p, chr, 0) ) {
-                    __to_state(p, DECNUM_START, &state, 0, chr);
+                    __to_state(p, DECNUM_START, &state, chr);
                     break;
                 }
 
@@ -440,13 +469,30 @@ void expconf_tokenize( struct expconf_parser *p
                 break;
 
             case DECNUM_START:
-                assert(0);
+
+                {
+                    int v = 0;
+                    if( __dec_digit(p, chr, &v) ) {
+                        state.decnum *= 10;
+                        state.decnum += (expconf_integer)v;
+                        break;
+                    }
+
+                    if( __newline(p, chr) || __space(p, chr) ) {
+                        __flush_token(p, EXPCONF_TOKEN_INTEGER, (void*)state.decnum, tok_cc, on_token);
+                        __to_state(p, INITIAL, &state, chr);
+                        break;
+                    }
+                }
+
+                expconf_set_parser_error(p, ERR_TOK_BAD_NUMBER);
+
                 break;
 
             case SQ_STRING_START:
 
                 if( chr == '\'' ) {
-                    __to_state(p, INITIAL, &state, 0, chr);
+                    __to_state(p, INITIAL, &state, chr);
                     // flush token
                     break;
                 }
@@ -457,7 +503,7 @@ void expconf_tokenize( struct expconf_parser *p
 
                 if( chr == '"' ) {
                     // flush token
-                    __to_state(p, INITIAL, &state, 0, chr);
+                    __to_state(p, INITIAL, &state, chr);
                     break;
                 }
 
@@ -465,20 +511,20 @@ void expconf_tokenize( struct expconf_parser *p
 
             case ATOM_START:
                 if( __newline(p, chr) ) {
-                    __flush_token(p, EXPCONF_TOKEN_ATOM, tok, tok_cc, on_token);
-                    __to_state(p, INITIAL, &state, 0, chr);
+                    __flush_token(p, EXPCONF_TOKEN_ATOM, state.tok, tok_cc, on_token);
+                    __to_state(p, INITIAL, &state, chr);
                     break;
                 }
 
                 if( __space(p, chr) ) {
-                    __flush_token(p, EXPCONF_TOKEN_ATOM, tok, tok_cc, on_token);
-                    __to_state(p, INITIAL, &state, 0, chr);
+                    __flush_token(p, EXPCONF_TOKEN_ATOM, state.tok, tok_cc, on_token);
+                    __to_state(p, INITIAL, &state, chr);
                     break;
                 }
 
                 if( __atom_chr(p, chr) ) {
                     // acc token
-                    if( !__acc_token(p, tok, chr) ) {
+                    if( !__acc_token(p, state.tok, chr) ) {
                         __error_invalid_atom(p);
                     }
                     break;
@@ -490,7 +536,7 @@ void expconf_tokenize( struct expconf_parser *p
 
             case COMMENT_START:
                 if( __newline(p, chr) ) {
-                    __to_state(p, INITIAL, &state, 0, chr);
+                    __to_state(p, INITIAL, &state, chr);
                     break;
                 }
                 break;
@@ -501,7 +547,7 @@ void expconf_tokenize( struct expconf_parser *p
         }
     }
 
-    strchunk_destroy(tok, p->allocator, p->dealloc);
+    __cleanup_state(p, &state);
 
 }
 
@@ -568,13 +614,21 @@ unsigned char *test1[] = { "# expconf file example"
                          , "do-nothing 'string-literal' 123456"
                          , "echo atom ### commented part of string"
                          , "t0123"
-                         , "1234jopa"
+                         , "1234 jopa"
                          , "'random string'"
                          , 0
                          };
 
 static void __dump_token(void *cc, struct expconf_token *token) {
     switch( token->tag ) {
+        case EXPCONF_TOKEN_INTEGER:
+            {
+                fprintf(stderr, "%s %ld\n"
+                              , expconf_token_tag_str(token->tag)
+                              , token->val.ei
+                              );
+            }
+            break;
         case EXPCONF_TOKEN_ATOM:
             {
                 struct strchunk *tok = token->val.chunk;
