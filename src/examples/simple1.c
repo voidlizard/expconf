@@ -19,6 +19,12 @@ typedef bool   (*read_char_t)(void*, unsigned char *);
 
 typedef size_t expconf_integer;
 
+typedef enum {
+     ERR_NO_ERROR
+   , ERR_TOK_UNKNOWN
+   , ERR_TOK_BAD_ATOM
+} expconf_parser_error;
+
 struct expconf;
 struct expconf_parser;
 
@@ -34,6 +40,8 @@ struct expconf_parser * expconf_parser_create( void *allocator
 
 
 void expconf_parser_destroy( struct expconf_parser ** );
+
+void expconf_set_parser_error( struct expconf_parser *p, expconf_parser_error err);
 
 // FIXME: move to impl.
 
@@ -262,6 +270,20 @@ static inline bool __atom_chr( struct expconf_parser *p
     return false;
 }
 
+static inline bool __dec_digit( struct expconf_parser *p
+                              , unsigned char c
+                              , int *value ) {
+    switch(c) {
+        case '0' ... '9':
+            if( value ) {
+                *value = (int)(c - '0');
+            }
+            return true;
+    }
+
+    return false;
+}
+
 static inline bool __line_comment_start( struct expconf_parser *p
                                        , unsigned char chr) {
     return chr == '#';
@@ -292,6 +314,10 @@ static inline void __inc_errors( struct expconf_parser *p ) {
 }
 
 static inline bool __error_invalid_atom( struct expconf_parser *p) {
+    expconf_set_parser_error(p, ERR_TOK_BAD_ATOM);
+}
+
+void expconf_set_parser_error( struct expconf_parser *p, expconf_parser_error err) {
     __inc_errors(p);
 }
 
@@ -331,7 +357,7 @@ static inline bool __acc_token( struct expconf_parser *p
 
 typedef enum {
     INITIAL
-  , NUM_START
+  , DECNUM_START
   , ATOM_START
   , SQ_STRING_START
   , DQ_STRING_START
@@ -396,10 +422,25 @@ void expconf_tokenize( struct expconf_parser *p
                 }
 
                 if( chr == '"' ) {
-                    __to_state(p, DQ_STRING_START, &state, 0, chr);
+                    __to_state(p, DQ_STRING_START, &state, &tok, chr);
                     break;
                 }
 
+                if( __dec_digit(p, chr, 0) ) {
+                    __to_state(p, DECNUM_START, &state, 0, chr);
+                    break;
+                }
+
+                if( __space(p, chr) || __newline(p, chr) ) {
+                    break;
+                }
+
+                expconf_set_parser_error(p, ERR_TOK_UNKNOWN);
+
+                break;
+
+            case DECNUM_START:
+                assert(0);
                 break;
 
             case SQ_STRING_START:
@@ -527,6 +568,7 @@ unsigned char *test1[] = { "# expconf file example"
                          , "do-nothing 'string-literal' 123456"
                          , "echo atom ### commented part of string"
                          , "t0123"
+                         , "1234jopa"
                          , "'random string'"
                          , 0
                          };
