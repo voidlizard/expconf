@@ -6,15 +6,8 @@
 #include "expconf.h"
 #include "strchunk.h"
 
-// this file
-
-void *__dumb_alloc(void *cc, size_t size) {
-    return malloc(size);
-}
-
-void __dumb_dealloc(void *cc, void *mem) {
-    free(mem);
-}
+#include "dump_token.h"
+#include "examples_common.h"
 
 struct char_reader_ss {
     bool   eof;
@@ -74,56 +67,12 @@ unsigned char *test1[] = { "# expconf file example"
                          , 0
                          };
 
-static void __dump_token(void *cc, struct expconf_token *token) {
-    switch( token->tag ) {
-        case EXPCONF_TOKEN_INTEGER:
-            {
-                fprintf(stderr, "%s %ld\n"
-                              , expconf_token_tag_str(token->tag)
-                              , token->val.ei
-                              );
-            }
-            break;
-        case EXPCONF_TOKEN_ATOM:
-            {
-                struct strchunk *tok = token->val.chunk;
-                const size_t len = strchunk_length(tok);
-
-                char tmp[EXPCONF_LIM_MAX_ATOM] = { 0 };
-                const size_t ltmp = sizeof(tmp) - 1;
-
-                fprintf(stderr, "%s(%ld) %s\n"
-                              , expconf_token_tag_str(token->tag)
-                              , len
-                              , strchunk_cstr(token->val.chunk, tmp, ltmp)
-                              );
-            }
-            break;
-        case EXPCONF_TOKEN_STRING:
-            {
-                struct strchunk *tok = token->val.chunk;
-                const size_t len = strchunk_length(tok);
-
-                char tmp[128] = { 0 };
-                const size_t ltmp = sizeof(tmp) - 1;
-
-                strchunk_cstr(token->val.chunk, tmp, ltmp);
-                fprintf(stderr, "%s(%ld) '%s%s'\n"
-                              , expconf_token_tag_str(token->tag)
-                              , len
-                              , strchunk_cstr(token->val.chunk, tmp, ltmp)
-                              , len < ltmp ? "" : ".."
-                              );
-            }
-            break;
-    }
-}
 
 int main(int argc, char **argv) {
 
     struct expconf *exp = expconf_create( 0
-                                        , __dumb_alloc
-                                        , __dumb_dealloc );
+                                        , example_alloc
+                                        , example_dealloc );
 
     assert( exp );
 
@@ -131,8 +80,8 @@ int main(int argc, char **argv) {
 
 
     struct expconf_parser *parser = expconf_parser_create( 0
-                                                         , __dumb_alloc
-                                                         , __dumb_dealloc );
+                                                         , example_alloc
+                                                         , example_dealloc );
 
     assert( parser );
 
@@ -151,7 +100,7 @@ int main(int argc, char **argv) {
                     , char_reader_ss_create(&ssreader, test1)
                     , char_reader_ss_read
                     , 0
-                    , __dump_token );
+                    , debug_dump_token);
 
     fprintf(stdout, "parse errors: %ld\n"
                   ,  expconf_parser_error_num(parser)
