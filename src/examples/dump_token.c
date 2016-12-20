@@ -6,6 +6,19 @@
 
 void debug_dump_token(void *cc, struct expconf_token *token) {
     switch( token->tag ) {
+
+        case EXPCONF_TOKEN_OPAREN:
+            {
+                fprintf(stderr, "OPAREN\n");
+            }
+            break;
+
+        case EXPCONF_TOKEN_CPAREN:
+            {
+                fprintf(stderr, "CPAREN\n");
+            }
+            break;
+
         case EXPCONF_TOKEN_INTEGER:
             {
                 fprintf(stderr, "%s %ld\n"

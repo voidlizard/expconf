@@ -48,6 +48,8 @@ typedef enum {
      EXPCONF_TOKEN_ATOM
    , EXPCONF_TOKEN_STRING
    , EXPCONF_TOKEN_INTEGER
+   , EXPCONF_TOKEN_OPAREN
+   , EXPCONF_TOKEN_CPAREN
 } expconf_token_tag;
 
 struct expconf_token {

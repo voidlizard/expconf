@@ -55,6 +55,10 @@ const char *expconf_token_tag_str(expconf_token_tag tag) {
             return "STRING";
         case EXPCONF_TOKEN_INTEGER:
             return "INTEGER";
+        case EXPCONF_TOKEN_OPAREN:
+            return "OPAREN";
+        case EXPCONF_TOKEN_CPAREN:
+            return "CPAREN";
     }
     assert(0);
 }
@@ -243,6 +247,18 @@ static inline bool __newline( struct expconf_parser *p
     return chr == '\n';
 }
 
+static inline bool __parens( struct expconf_parser *p
+                            , unsigned char chr) {
+
+    switch(chr) {
+        case '(':
+        case ')':
+            return true;
+    }
+
+    return false;
+}
+
 static inline bool __space( struct expconf_parser *p
                           , unsigned char chr) {
 
@@ -266,11 +282,8 @@ static inline bool __token_break( struct expconf_parser *p
     if( __newline(p, chr) )
         return true;
 
-/*    if( __obrace(p, chr) ) */
-/*        return true;*/
-
-/*    if( __cbrace(p, chr) ) */
-/*        return true;*/
+    if( __parens(p, chr) )
+        return true;
 
     return false;
 }
@@ -291,6 +304,17 @@ static inline void __flush_token( struct expconf_parser *p
 
 
     switch( tag ) {
+
+        case EXPCONF_TOKEN_OPAREN:
+        case EXPCONF_TOKEN_CPAREN:
+            {
+                struct expconf_token token = { .tag = tag
+                                             , .val = { 0 }
+                                             };
+                on_token(tok_cc, &token);
+            }
+            break;
+
         case EXPCONF_TOKEN_INTEGER:
             {
                 struct expconf_token token = { .tag = tag
@@ -493,11 +517,21 @@ void expconf_tokenize( struct expconf_parser *p
                     break;
                 }
 
-                if( __space(p, chr) || __newline(p, chr) ) {
+                if( chr == '(' ) {
+                    __flush_token(p, EXPCONF_TOKEN_OPAREN, 0, tok_cc, on_token);
+                    __call_state(p, INITIAL, &state, chr);
                     break;
                 }
 
-                fprintf(stderr, "WUT? %c %02x\n", chr, chr);
+                if( chr == ')' ) {
+                    __flush_token(p, EXPCONF_TOKEN_CPAREN, 0, tok_cc, on_token);
+                    __call_state(p, INITIAL, &state, chr);
+                    break;
+                }
+
+                if( __space(p, chr) || __newline(p, chr) ) {
+                    break;
+                }
 
                 expconf_set_parser_error(p, ERR_TOK_UNKNOWN);
 
@@ -526,6 +560,7 @@ void expconf_tokenize( struct expconf_parser *p
                     if( __token_break(p, chr) ) {
                         __flush_token(p, EXPCONF_TOKEN_INTEGER, (void*)state.decnum, tok_cc, on_token);
                         __call_state(p, INITIAL, &state, chr);
+                        unread = true;
                         break;
                     }
                 }
@@ -547,6 +582,7 @@ void expconf_tokenize( struct expconf_parser *p
                     if( __token_break(p, chr) ) {
                         __flush_token(p, EXPCONF_TOKEN_INTEGER, (void*)state.decnum, tok_cc, on_token);
                         __call_state(p, INITIAL, &state, chr);
+                        unread = true;
                         break;
                     }
                 }
@@ -692,6 +728,7 @@ void expconf_tokenize( struct expconf_parser *p
                 if( __token_break(p, chr) ) {
                     __flush_token(p, EXPCONF_TOKEN_ATOM, state.tok, tok_cc, on_token);
                     __call_state(p, INITIAL, &state, chr);
+                    unread = true;
                     break;
                 }
 
