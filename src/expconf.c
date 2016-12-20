@@ -133,6 +133,21 @@ static inline bool __atom_chr( struct expconf_parser *p
     return false;
 }
 
+static inline bool __oct_digit( struct expconf_parser *p
+                              , unsigned char c
+                              , int *value ) {
+
+    switch(c) {
+        case '0' ... '7':
+            if( value ) {
+                *value = (int)(c - '0');
+            }
+            return true;
+    }
+    return false;
+
+}
+
 static inline bool __dec_digit( struct expconf_parser *p
                               , unsigned char c
                               , int *value ) {
@@ -181,8 +196,26 @@ static bool __esc( struct expconf_parser *p
                  ) {
 
     switch( chr ) {
+        case '\'':
+            *un = '\'';
+            return true;
+        case '"':
+            *un = '\"';
+            return true;
+        case '?':
+            *un = '\?';
+            return true;
         case '\\':
             *un = '\\';
+            return true;
+        case 'a':
+            *un = '\a';
+            return true;
+        case 'b':
+            *un = '\b';
+            return true;
+        case 'f':
+            *un = '\f';
             return true;
         case 'n':
             *un = '\n';
@@ -192,6 +225,8 @@ static bool __esc( struct expconf_parser *p
             return true;
         case 't':
             *un = '\t';
+        case 'v':
+            *un = '\v';
             return true;
     }
 
@@ -308,6 +343,8 @@ typedef enum {
   , SQ_STRING_START
   , DQ_STRING_START
   , CHR_ESC
+  , CHR_ESC_HEX
+  , CHR_ESC_OCT
   , COMMENT_START
 } tok_state_t;
 
@@ -316,6 +353,13 @@ struct tok_state {
     tok_state_t state;
     struct strchunk *tok;
     expconf_integer  decnum;
+
+    struct {
+        int base;
+        int i;
+        int val;
+    } quot;
+
 };
 
 static inline void __cleanup_state( struct expconf_parser *p
@@ -370,7 +414,12 @@ static inline void __call_state( struct expconf_parser *p
             state->tok = strchunk_create(p->allocator, p->alloc);
             break;
 
+        case CHR_ESC:
+            memset(&state->quot, 0, sizeof(state->quot));
+            break;
+
     }
+
 
     if( state->state == ATOM_START ) {
         strchunk_append_char(state->tok, input, p->allocator, p->alloc);
@@ -386,6 +435,8 @@ void expconf_tokenize( struct expconf_parser *p
 
 
     bool stop = false;
+    bool unread = false;
+
     struct tok_state state = { .prev  = INITIAL
                              , .state = INITIAL
                              , .tok = 0
@@ -393,7 +444,17 @@ void expconf_tokenize( struct expconf_parser *p
                              };
 
     unsigned char chr = 0;
-    for(; readfn(reader, &chr) && expconf_parser_ok(p); ) {
+    for( ;!stop; ) {
+
+        if( !expconf_parser_ok(p) ) {
+            break;
+        }
+
+        if( unread ) {
+            unread = false;
+        } else if( !readfn(reader, &chr)) {
+            break;
+        }
 
         if( __newline(p, chr) ) {
             expconf_parser_line_inc(p);
@@ -435,6 +496,8 @@ void expconf_tokenize( struct expconf_parser *p
                 if( __space(p, chr) || __newline(p, chr) ) {
                     break;
                 }
+
+                fprintf(stderr, "WUT? %c %02x\n", chr, chr);
 
                 expconf_set_parser_error(p, ERR_TOK_UNKNOWN);
 
@@ -545,8 +608,84 @@ void expconf_tokenize( struct expconf_parser *p
                         __jump_state(p, state.prev, &state, chr);
                         break;
                     }
+
+                    if( chr == 'X' || chr == 'x' ) {
+                        tok_state_t old = state.prev;
+                        __jump_state(p, CHR_ESC_HEX, &state, chr);
+                        state.prev = old;
+                        state.quot.base = 16;
+                        break;
+                    }
+
+                    int val = 0;
+
+                    if( __oct_digit(p, chr, &val) ) {
+                        tok_state_t old = state.prev;
+                        __jump_state(p, CHR_ESC_OCT, &state, chr);
+                        state.prev = old;
+                        state.quot.base = 8;
+                        state.quot.val = val;
+                        state.quot.i++;
+                        break;
+                    }
+
                 }
+
                 expconf_set_parser_error(p, ERR_TOK_BAD_STRING);
+                break;
+
+            case CHR_ESC_OCT:
+                {
+                    int val = 0;
+                    bool ok = false;
+                    if( __oct_digit(p, chr, &val) ) {
+                        state.quot.val *= 8;
+                        state.quot.val += val;
+                        state.quot.i++;
+                        ok = true;
+                    }
+
+                    if( state.quot.i >= 3 || !ok ) {
+                        if( !__acc_string(p, state.tok, (unsigned char)state.quot.val) ) {
+                            expconf_set_parser_error(p, ERR_TOK_STRING_TOO_LARGE);
+                            break;
+                        }
+                        __jump_state(p, state.prev, &state, chr);
+
+                        if( !ok ) {
+                            unread = true;
+                        }
+
+                        break;
+                    }
+                }
+                break;
+
+            case CHR_ESC_HEX:
+                {
+                    int val = 0;
+                    bool ok = false;
+                    if( __hex_digit(p, chr, &val) ) {
+                        state.quot.val *= 16;
+                        state.quot.val += val;
+                        state.quot.i++;
+                        ok = true;
+                    }
+
+                    if( state.quot.i >= 2 || !ok ) {
+                        if( !__acc_string(p, state.tok, (unsigned char)state.quot.val) ) {
+                            expconf_set_parser_error(p, ERR_TOK_STRING_TOO_LARGE);
+                            break;
+                        }
+                        __jump_state(p, state.prev, &state, chr);
+
+                        if( !ok ) {
+                            unread = true;
+                        }
+
+                        break;
+                    }
+                }
                 break;
 
             case ATOM_START:
