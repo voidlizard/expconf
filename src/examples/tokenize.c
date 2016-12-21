@@ -44,6 +44,23 @@ int main(int argc, char *argv[]) {
         }
 
         switch( token.tag ) {
+            case TOK_STRING:
+                {
+                    const size_t len = strchunk_length(token.v.strval);
+
+                    char tmp[128] = { 0 };
+                    const size_t ltmp = sizeof(tmp) - 1;
+
+                    fprintf(stdout, "%s(%ld) '%s%s'\n"
+                                  , exp_token_tag_name(token.tag)
+                                  , len
+                                  , strchunk_cstr(token.v.strval, tmp, ltmp)
+                                  , len < ltmp ? "" : ".."
+                                  );
+                }
+                break;
+
+
             case TOK_ATOM:
                 {
                     char tmp[EXP_LIM_MAX_ATOM+1];

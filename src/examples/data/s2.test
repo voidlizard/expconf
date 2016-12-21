@@ -1,0 +1,9 @@
+#"3 tabs:\t\t\t"
+
+"string with octal \101\40\102\040\103ontinued"
+"dbstring 1 with hex-quote \x41"
+
+"dbstring 2 with hex-quote \x41\x42\x43\x20string\x20continued"
+
+"dbstring 3 with oct-quote \101\040\102\040\103\040continue"
+

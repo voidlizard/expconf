@@ -24,6 +24,8 @@ struct exp_tokenizer {
         integer value;
     } intval;
 
+    struct strchunk *pstr;
+
     void *allocator;
     alloc_function_t alloc;
     dealloc_function_t dealloc;
@@ -61,6 +63,7 @@ struct exp_tokenizer *exp_tokenizer_create( void *allocator
 
 void exp_tokenizer_destroy( struct exp_tokenizer **t ) {
     struct exp_tokenizer *tt = *t;
+    strchunk_destroy(tt->pstr, tt->allocator, tt->dealloc);
     tt->dealloc(tt->allocator, *t);
     *t = 0;
 }
@@ -140,37 +143,10 @@ static bool is_token_term(void *c, unsigned char chr) {
     return is_space(0, chr) || is_punct(0, chr);
 }
 
-static bool is_atom_start( void *cc
-                         , unsigned char c) {
-    switch(c) {
-        case 'a' ... 'z':
-        case 'A' ... 'Z':
-        case '_':
-        case '$':
-        case '@':
-            return true;
-        default:
-            return false;
-    }
-    return false;
-}
-
 static bool is_atom( void *cc
                    , unsigned char c) {
-    switch(c) {
-        case 'a' ... 'z':
-        case 'A' ... 'Z':
-        case '0' ... '9':
-        case '.':
-        case '-':
-        case '_':
-        case '$':
-        case '@':
-            return true;
-        default:
-            return false;
-    }
-    return false;
+
+    return !is_space(0, c) && !is_punct(0, c);
 }
 
 static bool is_oct_digit( void *cc
@@ -209,14 +185,17 @@ static bool is_hex_digit( void *cc
 static void ignore(void *cc, unsigned char c) {
 }
 
-static inline void takewhile( struct exp_tokenizer *t
-                            , void *pred_cc
-                            , bool (*pred)(void*,unsigned char)
-                            , void *fn_cc
-                            , void (*fn)(void*,unsigned char)
-                            ) {
+static inline void takewhile_n( struct exp_tokenizer *t
+                              , int max
+                              , void *pred_cc
+                              , bool (*pred)(void*,unsigned char)
+                              , void *fn_cc
+                              , void (*fn)(void*,unsigned char)
+                              ) {
 
-    for(; !eof(t); ) {
+    bool all = max < 0;
+
+    for(; (all || max > 0) && !eof(t); max--) {
         unsigned char *pc = __readchar(t);
 
         if( pc && pred(pred_cc, *pc) ) {
@@ -227,6 +206,8 @@ static inline void takewhile( struct exp_tokenizer *t
         }
     }
 }
+
+#define takewhile(t, ccp, pred, ccf, f) takewhile_n((t), (-1), (ccp), (pred), (ccf), (f))
 
 struct inv_pred_cc {
     void *cc;
@@ -274,8 +255,150 @@ static void emit_token( struct exp_tokenizer *t
         case TOK_INTEGER:
             tok->v.intval = *(integer*)data;
             break;
+
+        case TOK_STRING:
+            tok->v.strval = data;
+            break;
+
+        default:
+            assert(0);
+            break;
     }
 
+}
+
+
+static bool esc( unsigned char chr
+               , unsigned char *un
+               ) {
+
+    switch( chr ) {
+        case '\'':
+            *un = '\'';
+            return true;
+        case '"':
+            *un = '\"';
+            return true;
+        case '?':
+            *un = '\?';
+            return true;
+        case '\\':
+            *un = '\\';
+            return true;
+        case 'a':
+            *un = '\a';
+            return true;
+        case 'b':
+            *un = '\b';
+            return true;
+        case 'f':
+            *un = '\f';
+            return true;
+        case 'n':
+            *un = '\n';
+            return true;
+        case 'r':
+            *un = '\r';
+            return true;
+        case 't':
+            *un = '\t';
+        case 'v':
+            *un = '\v';
+            return true;
+    }
+
+    return false;
+}
+
+static bool unescape( struct exp_tokenizer *t ) {
+
+    unsigned char *pc = __readchar(t);
+    unsigned char un = 0;
+    unsigned char *pun = 0;
+
+    if( !pc ) {
+        return false;
+    }
+
+    if( *pc == 'x' || *pc == 'X' ) {
+        // hex quot
+        integer_init(t, 16);
+        takewhile_n(t, 2, 0, is_hex_digit, t, integer_acc);
+        if( t->intval.digits ) {
+            un = (unsigned char)t->intval.value;
+            pun = &un;
+        }
+    }
+    else if( is_oct_digit(0, *pc) ) {
+        // octal quot
+        integer_init(t, 8);
+        integer_acc(t, *pc);
+        takewhile_n(t, 2, 0, is_oct_digit, t, integer_acc);
+        if( t->intval.digits ) {
+            un = (unsigned char)t->intval.value;
+            pun = &un;
+        }
+    }
+    else if( esc(*pc, &un) ) {
+        pun = &un;
+    }
+    else {
+        return false;
+    }
+
+    if( pun ) {
+        return strchunk_append_char( t->pstr
+                                   , *pun
+                                   , t->allocator
+                                   , t->alloc );
+    }
+
+    return false;
+
+}
+
+static bool scan_string( struct exp_tokenizer *t
+                       , unsigned char q
+                       , struct exp_token *tok
+                       ) {
+
+    if( t->pstr ) {
+        strchunk_destroy(t->pstr, t->allocator, t->dealloc);
+    }
+
+    t->pstr = strchunk_create(t->allocator, t->alloc);
+
+    if( !t->pstr ) {
+        return false;
+    }
+
+    for(;!eof(t);) {
+        unsigned char *pc = __readchar(t);
+        if( !pc ) {
+            break;
+        }
+
+        if( *pc == '\\' ) {
+            // handle quotation
+            if( !unescape(t) ) {
+                break;
+            }
+            continue;
+        }
+
+        if( *pc == q ) {
+            // emit token
+            emit_token(t, TOK_STRING, t->pstr, tok);
+            return true;
+        }
+
+        if( !strchunk_append_char(t->pstr, *pc, t->allocator, t->alloc) ) {
+            break;
+        }
+    }
+
+    emit_token(t, TOK_ERROR, 0, tok);
+    return false;
 }
 
 bool exp_tokenizer_next( struct exp_tokenizer *t
@@ -309,13 +432,6 @@ bool exp_tokenizer_next( struct exp_tokenizer *t
             return true;
         }
 
-        if( is_atom_start(0, *pc) ) {
-            atom_init(t);
-            atom_append(t, *pc);
-            takewhile(t, 0, is_atom, t, atom_append);
-            emit_token(t, TOK_ATOM, &t->atom.chunk, tok);
-            return true;
-        }
 
         if( is_dec_digit(0, *pc) ) {
 
@@ -345,7 +461,23 @@ bool exp_tokenizer_next( struct exp_tokenizer *t
                     return true;
                 }
             }
+            return true;
         }
+
+        if( *pc == '"' || *pc == '\'' ) {
+            // handle string
+            scan_string(t, *pc, tok);
+            return true;
+        }
+
+        if( is_atom(0, *pc) ) {
+            atom_init(t);
+            atom_append(t, *pc);
+            takewhile(t, 0, is_atom, t, atom_append);
+            emit_token(t, TOK_ATOM, &t->atom.chunk, tok);
+            return true;
+        }
+
 
         break;
 
@@ -390,6 +522,8 @@ const char *exp_token_tag_name(exp_token_tag tag) {
             return "ATOM";
         case TOK_INTEGER:
             return "INTEGER";
+        case TOK_STRING:
+            return "STRING";
         default:
             assert(0);
     }

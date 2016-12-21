@@ -31,6 +31,7 @@ typedef enum {
   , TOK_CPAREN
   , TOK_ATOM
   , TOK_INTEGER
+  , TOK_STRING
 } exp_token_tag;
 
 
@@ -38,6 +39,7 @@ struct exp_token {
     exp_token_tag tag;
     union {
         struct strchunk *atom;
+        struct strchunk *strval;
         integer          intval;
     } v;
 };
