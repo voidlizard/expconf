@@ -6,7 +6,6 @@
 
 #include "allocators.h"
 
-typedef size_t (*read_block_t)(void*, size_t);
 typedef bool   (*read_char_t)(void*, unsigned char *);
 
 // FIXME: move to header
