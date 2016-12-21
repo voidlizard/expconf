@@ -7,6 +7,8 @@
 #include "allocators.h"
 #include "strchunk.h"
 
+#define EXP_LIM_MAX_ATOM 255
+
 typedef bool   (*read_char_fn)(void*, unsigned char *);
 
 struct exp_tokenizer;
@@ -25,10 +27,15 @@ typedef enum {
     TOK_ERROR
   , TOK_OPAREN
   , TOK_CPAREN
+  , TOK_ATOM
 } exp_token_tag;
+
 
 struct exp_token {
     exp_token_tag tag;
+    union {
+        struct strchunk *atom;
+    } v;
 };
 
 bool exp_tokenizer_next( struct exp_tokenizer *t

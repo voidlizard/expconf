@@ -8,10 +8,15 @@
 struct exp_tokenizer {
 
     struct {
+        bool           eof;
         unsigned char *pc;
         unsigned char  data;
-        bool           eof;
     } read;
+
+    struct {
+        struct strchunk chunk;
+        unsigned char buf[EXP_LIM_MAX_ATOM+1];
+    } atom;
 
     void *allocator;
     alloc_function_t alloc;
@@ -54,6 +59,16 @@ void exp_tokenizer_destroy( struct exp_tokenizer **t ) {
     *t = 0;
 }
 
+static void atom_init(struct exp_tokenizer *t) {
+    strchunk_fixed(&t->atom, sizeof(t->atom));
+}
+
+static void atom_append(void *t_, unsigned char c) {
+    struct exp_tokenizer *t = t_;
+    if( strchunk_used(&t->atom.chunk) < EXP_LIM_MAX_ATOM ) {
+        strchunk_append_char(&t->atom.chunk, c, t->allocator, t->alloc);
+    }
+}
 
 static inline bool eof(struct exp_tokenizer *t) {
     return t->read.eof;
@@ -74,6 +89,40 @@ static bool is_line_comment(void *c, unsigned char chr) {
 static bool is_newline(void *c, unsigned char chr) {
     return chr == '\n';
 }
+
+static bool is_atom_start( void *cc
+                         , unsigned char c) {
+    switch(c) {
+        case 'a' ... 'z':
+        case 'A' ... 'Z':
+        case '_':
+        case '$':
+        case '@':
+            return true;
+        default:
+            return false;
+    }
+    return false;
+}
+
+static inline bool is_atom( void *cc
+                          , unsigned char c) {
+    switch(c) {
+        case 'a' ... 'z':
+        case 'A' ... 'Z':
+        case '0' ... '9':
+        case '.':
+        case '-':
+        case '_':
+        case '$':
+        case '@':
+            return true;
+        default:
+            return false;
+    }
+    return false;
+}
+
 
 static void ignore(void *cc, unsigned char c) {
 }
@@ -127,11 +176,17 @@ static void emit_token( struct exp_tokenizer *t
                       , void *data
                       , struct exp_token *tok ) {
 
+
+    tok->tag = tag;
+
     switch(tag) {
         case TOK_ERROR:
         case TOK_OPAREN:
         case TOK_CPAREN:
-            tok->tag = tag;
+            break;
+
+        case TOK_ATOM:
+            tok->v.atom = data;
             break;
     }
 
@@ -161,6 +216,14 @@ bool exp_tokenizer_next( struct exp_tokenizer *t
 
         if( *pc == ')' ) {
             emit_token(t, TOK_CPAREN, 0, tok);
+            return true;
+        }
+
+        if( is_atom_start(0, *pc) ) {
+            atom_init(t);
+            atom_append(t, *pc);
+            takewhile(t, 0, is_atom, t, atom_append);
+            emit_token(t, TOK_ATOM, &t->atom.chunk, tok);
             return true;
         }
 
@@ -202,6 +265,8 @@ const char *exp_token_tag_name(exp_token_tag tag) {
             return "OPAREN";
         case TOK_CPAREN:
             return "CPAREN";
+        case TOK_ATOM:
+            return "ATOM";
         default:
             assert(0);
     }

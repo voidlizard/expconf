@@ -42,7 +42,24 @@ int main(int argc, char *argv[]) {
         if( !exp_tokenizer_next(tokenizer, &token) ) {
             break;
         }
-        fprintf(stdout, "%s\n", exp_token_tag_name(token.tag));
+
+        switch( token.tag ) {
+            case TOK_ATOM:
+                {
+                    char tmp[EXP_LIM_MAX_ATOM+1];
+                    fprintf(stdout, "%s(%ld) %s\n"
+                                  , exp_token_tag_name(token.tag)
+                                  , strchunk_used(token.v.atom)
+                                  , strchunk_cstr(token.v.atom, tmp, sizeof(tmp))
+                           );
+                }
+                break;
+
+            default:
+                fprintf(stdout, "%s\n", exp_token_tag_name(token.tag));
+                break;
+        }
+
     }
 
 /*    expconf_tokenize( parser*/

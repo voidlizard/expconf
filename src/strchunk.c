@@ -1,16 +1,8 @@
 #include "strchunk.h"
 #include <string.h>
 
-// to miscdata ?
-struct strchunk {
-    struct strchunk *next;
-    unsigned char *sp;
-    unsigned char *se;
-    unsigned char sdata[0];
-};
-
 size_t strchunk_used( struct strchunk *s ) {
-    return s->sp - s->sdata;
+    return s->p - s->data;
 }
 
 struct strchunk * strchunk_create( void *allocator
@@ -18,21 +10,33 @@ struct strchunk * strchunk_create( void *allocator
                                  ) {
 
     const size_t chunksize = 4096;
-    const size_t ssize = sizeof(struct strchunk);
+    return strchunk_fixed(alloc(allocator, chunksize), chunksize);
+}
 
-    struct strchunk *s = alloc(allocator, chunksize);
+struct strchunk * strchunk_fixed( void *mem
+                                , size_t mem_size ) {
 
-    if( !s ) {
+
+    if( !mem ) {
         return 0;
     }
 
-    memset(s, 0, chunksize);
-
-    s->sp = &s->sdata[0];
-
+    const size_t chunksize = mem_size;
+    const size_t ssize = sizeof(struct strchunk);
     const size_t smax = chunksize > ssize ? chunksize - ssize : 0;
 
-    s->se = &s->sdata[smax];
+    if( mem_size < sizeof(struct strchunk)) {
+        return 0;
+    }
+
+    struct strchunk *s = mem;
+
+    memset(s, 0, chunksize);
+
+    s->next = 0;
+    s->data = &s->buf[0];
+    s->p    = s->data;
+    s->end  = &s->buf[smax];
 
     return s;
 }
@@ -51,7 +55,7 @@ void strchunk_destroy( struct strchunk *chunk
 }
 
 bool strchunk_avail( struct strchunk *chunk ) {
-    return chunk->sp < chunk->se;
+    return chunk->p < chunk->end;
 }
 
 
@@ -71,8 +75,8 @@ unsigned char *strchunk_cstr(struct strchunk *chunk, unsigned char *dst, size_t 
     unsigned char *de = &dst[len-1];
 
     for(; dp < de && chunk; chunk = chunk->next ) {
-        unsigned char *p = chunk->sdata;
-        unsigned char *pe = chunk->sp;
+        unsigned char *p = chunk->data;
+        unsigned char *pe = chunk->p;
         for(; p < pe && dp < de; p++, dp++ ) {
             *dp = *p;
         }
@@ -96,8 +100,8 @@ bool strchunk_append_char( struct strchunk *chunk_
         return false;
     }
 
-    *s->sp = c;
-     s->sp++;
+    *s->p = c;
+     s->p++;
 
     return true;
 }

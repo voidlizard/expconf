@@ -4,9 +4,20 @@
 #include <stdbool.h>
 #include "allocators.h"
 
-struct strchunk;
+// to miscdata ?
+struct strchunk {
+    struct strchunk *next;
+    unsigned char *data;
+    unsigned char *p;
+    unsigned char *end;
+    unsigned char buf[0];
+};
 
 size_t strchunk_used( struct strchunk *s );
+
+
+struct strchunk * strchunk_fixed( void *mem
+                                , size_t mem_size );
 
 struct strchunk * strchunk_create( void *allocator
                                  , alloc_function_t alloc
