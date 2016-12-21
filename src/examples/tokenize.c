@@ -55,6 +55,16 @@ int main(int argc, char *argv[]) {
                 }
                 break;
 
+            case TOK_INTEGER:
+                {
+                    fprintf(stdout, "%s %ld\n"
+                                  , exp_token_tag_name(token.tag)
+                                  , token.v.intval
+                           );
+                }
+                break;
+
+
             default:
                 fprintf(stdout, "%s\n", exp_token_tag_name(token.tag));
                 break;

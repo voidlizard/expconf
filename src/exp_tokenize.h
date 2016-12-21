@@ -3,12 +3,14 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 #include "allocators.h"
 #include "strchunk.h"
 
 #define EXP_LIM_MAX_ATOM 255
 
+typedef ssize_t integer;
 typedef bool   (*read_char_fn)(void*, unsigned char *);
 
 struct exp_tokenizer;
@@ -28,6 +30,7 @@ typedef enum {
   , TOK_OPAREN
   , TOK_CPAREN
   , TOK_ATOM
+  , TOK_INTEGER
 } exp_token_tag;
 
 
@@ -35,6 +38,7 @@ struct exp_token {
     exp_token_tag tag;
     union {
         struct strchunk *atom;
+        integer          intval;
     } v;
 };
 
