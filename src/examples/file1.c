@@ -12,7 +12,13 @@
 
 int main(int argc, char *argv[]) {
 
-    const char *fname = "data/file1.conf";
+
+    if( argc < 2 ) {
+        fprintf(stderr, "usage: file file-name\n");
+        exit(1);
+    }
+
+    const char *fname = argv[1];
 
     struct expconf_parser *parser = expconf_parser_create( 0
                                                          , example_alloc
