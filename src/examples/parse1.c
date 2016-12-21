@@ -12,7 +12,7 @@ int main(int argc, char *argv[]) {
 
 
     if( argc < 2 ) {
-        fprintf(stderr, "usage: tokenize file-name\n");
+        fprintf(stderr, "usage: parse file-name\n");
         exit(1);
     }
 
@@ -36,13 +36,14 @@ int main(int argc, char *argv[]) {
 
     assert( tokenizer );
 
-
     for(;;) {
         struct exp_token token = { 0 };
         if( !exp_tokenizer_next(tokenizer, &token) ) {
             break;
         }
-        dump_token(stdout, &token);
+
+        dump_token(&token);
+
     }
 
 __exit:
