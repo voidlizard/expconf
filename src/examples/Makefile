@@ -8,10 +8,8 @@ EXPCONF_SOURCES+= expconf.c
 EXPCONF_SOURCES+= exp_tokenize.c
 EXPCONF_SOURCES+= strchunk.c
 
-EXAMPLES_COMMON_SOURCES+=dump_token.c examples_common.c
+EXAMPLES_COMMON_SOURCES+=examples_common.c
 
-SIMPLE1_SOURCES+=simple1.c $(EXAMPLES_COMMON_SOURCES)
-FILE1_SOURCES+=file1.c $(EXAMPLES_COMMON_SOURCES)
 TOKENIZE_SOURCES+=tokenize.c $(EXAMPLES_COMMON_SOURCES)
 
 $(eval $(call add_include_dir, $(EXPCONF_DIR)))
