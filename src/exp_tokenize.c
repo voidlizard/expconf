@@ -401,11 +401,11 @@ static bool scan_string( struct exp_tokenizer *t
     return false;
 }
 
-bool exp_tokenizer_next( struct exp_tokenizer *t
-                       , struct exp_token *tok ) {
+struct exp_token * exp_tokenizer_next( struct exp_tokenizer *t
+                                     , struct exp_token *tok ) {
 
     if( eof(t) ) {
-        return false;
+        return 0;
     }
 
     do {
@@ -414,7 +414,7 @@ bool exp_tokenizer_next( struct exp_tokenizer *t
         unsigned char *pc = __readchar(t);
 
         if( !pc )
-            return false;
+            return 0;
 
         if( is_line_comment(t, *pc) ) {
             skip_until(t, 0, is_newline);
@@ -424,12 +424,12 @@ bool exp_tokenizer_next( struct exp_tokenizer *t
 
         if( *pc == '(' ) {
             emit_token(t, TOK_OPAREN, 0, tok);
-            return true;
+            return tok;
         }
 
         if( *pc == ')' ) {
             emit_token(t, TOK_CPAREN, 0, tok);
-            return true;
+            return tok;
         }
 
 
@@ -458,16 +458,16 @@ bool exp_tokenizer_next( struct exp_tokenizer *t
                 if( !pcc || is_token_term(0, *pcc) ) {
                     __unread(t);
                     emit_token(t, TOK_INTEGER, &t->intval.value, tok);
-                    return true;
+                    return tok;
                 }
             }
-            return true;
+            return tok;
         }
 
         if( *pc == '"' || *pc == '\'' ) {
             // handle string
             scan_string(t, *pc, tok);
-            return true;
+            return tok;
         }
 
         if( is_atom(0, *pc) ) {
@@ -475,7 +475,7 @@ bool exp_tokenizer_next( struct exp_tokenizer *t
             atom_append(t, *pc);
             takewhile(t, 0, is_atom, t, atom_append);
             emit_token(t, TOK_ATOM, &t->atom.chunk, tok);
-            return true;
+            return tok;
         }
 
 
@@ -484,7 +484,7 @@ bool exp_tokenizer_next( struct exp_tokenizer *t
     } while(1);
 
     emit_token(t, TOK_ERROR, 0, tok);
-    return  true;
+    return tok;
 }
 
 static inline void __unread(struct exp_tokenizer* t) {

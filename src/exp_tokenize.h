@@ -5,12 +5,12 @@
 #include <stddef.h>
 #include <stdlib.h>
 
+#include "exp_lang_types.h"
 #include "allocators.h"
 #include "strchunk.h"
 
 #define EXP_LIM_MAX_ATOM 255
 
-typedef ssize_t integer;
 typedef bool   (*read_char_fn)(void*, unsigned char *);
 
 struct exp_tokenizer;
@@ -44,8 +44,8 @@ struct exp_token {
     } v;
 };
 
-bool exp_tokenizer_next( struct exp_tokenizer *t
-                       , struct exp_token *tok );
+struct exp_token *exp_tokenizer_next( struct exp_tokenizer *t
+                                    , struct exp_token *tok );
 
 
 const char *exp_token_tag_name(exp_token_tag);

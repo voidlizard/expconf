@@ -11,11 +11,13 @@ EXPCONF_SOURCES+= strchunk.c
 EXAMPLES_COMMON_SOURCES+=examples_common.c
 
 TOKENIZE_SOURCES+=tokenize.c $(EXAMPLES_COMMON_SOURCES)
+PARSE1_SOURCES+=parse1.c $(EXAMPLES_COMMON_SOURCES)
 
 $(eval $(call add_include_dir, $(EXPCONF_DIR)))
 $(eval $(call add_source_dir,  $(EXPCONF_DIR), $(EXPCONF_SOURCES)))
 
 $(eval $(call ExecFile,tokenize, $(TOKENIZE_SOURCES) $(ALLSOURCES)))
+$(eval $(call ExecFile,parse1, $(PARSE1_SOURCES) $(ALLSOURCES)))
 
 all: $(ALLEXECUTABLES)
 

@@ -39,10 +39,11 @@ int main(int argc, char *argv[]) {
 
     for(;;) {
         struct exp_token token = { 0 };
-        if( !exp_tokenizer_next(tokenizer, &token) ) {
+        struct exp_token *tok = exp_tokenizer_next(tokenizer, &token);
+        if( !tok ) {
             break;
         }
-        dump_token(stdout, &token);
+        dump_token(stdout, tok);
     }
 
 __exit:
