@@ -10,7 +10,10 @@
 #include "examples_common.h"
 
 typedef enum {
-      LIT_INTEGER
+      INTEGER
+    , ATOM
+    , STRING
+    , LIST
     , NIL
 } exp_cell_type;
 
@@ -23,6 +26,8 @@ struct exp_cell {
     } car;
 
     struct exp_cell *cdr;
+
+    char celldata[0];
 };
 
 #define exp_nil 0
@@ -44,7 +49,6 @@ struct exp_parser {
 
 
 struct exp_cell *exp_cell_new( exp_cell_type t
-                             , void *data
                              , void *allocator
                              , alloc_function_t alloc) {
 
@@ -58,13 +62,51 @@ struct exp_cell *exp_cell_new( exp_cell_type t
     }
 
     memset(cell, 0, cell_size);
+    cell->tag = t;
 
-    switch( t ) {
-        case LIT_INTEGER:
-            cell->tag = t;
-            cell->car.integer = *(integer*)data;
-            break;
-    }
+    return cell;
+}
+
+#define EXP_ALLOC_CELL(cell, t, a, alloc) do {\
+        (cell) = exp_cell_new((t), (a), (alloc));\
+        if( !cell ) {\
+            return 0;\
+        }\
+    }while(0)\
+
+
+struct exp_cell* exp_integer( integer v
+                            , void *allocator
+                            , alloc_function_t alloc) {
+
+    struct exp_cell *cell = 0;
+
+    EXP_ALLOC_CELL(cell, INTEGER, allocator, alloc);
+
+    cell->car.integer = v;
+
+    return cell;
+}
+
+struct exp_cell* exp_atom( void *atom
+                         , void *allocator
+                         , alloc_function_t alloc ) {
+    return exp_nil;
+}
+
+struct exp_cell* exp_list( struct exp_cell *car
+                         , struct exp_cell *cdr
+                         , void *allocator
+                         , alloc_function_t alloc ) {
+
+
+    struct exp_cell *cell = 0;
+
+    EXP_ALLOC_CELL(cell, INTEGER, allocator, alloc);
+
+    cell->tag = LIST;
+    cell->car.expr = car;
+    cell->cdr = cdr;
 
     return cell;
 }
@@ -120,7 +162,40 @@ struct exp_token *exp_parser_get_token(struct exp_parser* p) {
     return p->token.curr;
 }
 
-struct exp_cell *exp_parse_expr(struct exp_parser *p) {
+
+struct exp_token *exp_parser_unget_token(struct exp_parser* p) {
+    p->token.back = p->token.curr;
+}
+
+struct exp_cell *exp_parse_expr( struct exp_parser *p, struct exp_cell *top );
+
+struct exp_cell *exp_parse_list(struct exp_parser *p) {
+
+    struct exp_token *tok = exp_parser_get_token(p);
+
+    if( !tok ) {
+        // FIXME: parse error
+        return exp_nil;
+    }
+
+    if( tok->tag == TOK_CPAREN ) {
+        return exp_nil;
+    }
+
+    exp_parser_unget_token(p);
+
+    struct exp_cell *car = exp_parse_expr(p, false);
+    struct exp_cell *cdr = exp_parse_list(p);
+
+    return exp_list(car, cdr, p->allocator, p->alloc);
+}
+
+struct exp_cell *exp_parse_expr( struct exp_parser *p, struct exp_cell *top ) {
+
+    if( top ) {
+        exp_list(top, exp_parse_list(p), p->allocator, p->alloc);
+    }
+
     struct exp_token *tok = exp_parser_get_token(p);
 
     if( !tok ) {
@@ -129,10 +204,24 @@ struct exp_cell *exp_parse_expr(struct exp_parser *p) {
 
     switch( tok->tag ) {
         case TOK_INTEGER:
-            fprintf(stderr, "GOT INT LITERAL %ld\n", tok->v.intval);
-            return exp_cell_new(LIT_INTEGER, &tok->v.intval, p->allocator, p->alloc);
+            return exp_integer(tok->v.intval, p->allocator, p->alloc);
+
+        case TOK_ATOM:
+            // КУДА ДЕВАТЬ АТОМЫ?
+            return exp_nil;
+
+        case TOK_STRING:
+            // КУДА ДЕВАТЬ СТРОКИ?
+            return exp_nil;
+
+        case TOK_OPAREN:
+            return exp_parse_list(p);
+
+        case TOK_CPAREN:
+            return exp_nil;
 
         default:
+            assert(0);
             // TODO: parse error?
             return exp_nil;
     }
@@ -140,10 +229,33 @@ struct exp_cell *exp_parse_expr(struct exp_parser *p) {
     return exp_nil;
 }
 
-struct exp_cell *exp_parse( struct exp_parser *parser ) {
-    return exp_parse_expr(parser);
+struct exp_cell *exp_parse(struct exp_parser *parser, struct exp_cell *top) {
+    return exp_parse_expr(parser, top);
 }
 
+
+void dump_cell(void *cc, struct exp_cell *cell) {
+
+    if( !cell ) {
+        fprintf(stdout, "(nil)");
+        return;
+    }
+
+    switch( cell->tag ) {
+        case INTEGER:
+            fprintf(stdout, "I#%ld ", cell->car.integer);
+            break;
+        case LIST:
+            fprintf(stdout, "(");
+            dump_cell(cc, cell->car.expr);
+            dump_cell(cc, cell->cdr);
+            fprintf(stdout, ")");
+            break;
+        default:
+            assert(0);
+            break;
+    }
+}
 
 int main(int argc, char *argv[]) {
 
@@ -162,18 +274,22 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
 
+
+    void *allocator = 0;
+    alloc_function_t alloc = example_alloc;
+    dealloc_function_t dealloc = example_dealloc;
+
     struct exp_parser pmem = { 0 };
     struct exp_parser *p = exp_parser_create( &pmem
                                             , file
                                             , file_read_char
-                                            , 0
-                                            , example_alloc
-                                            , example_dealloc );
+                                            , allocator
+                                            , alloc
+                                            , dealloc );
 
-    struct exp_cell *cell = exp_parse(p);
+    struct exp_cell *cell = exp_parse(p, exp_atom("prog", allocator, alloc) );
 
-    fprintf(stderr, "cell %p\n", cell);
-
+    dump_cell(0, cell);
 
 __exit:
 
