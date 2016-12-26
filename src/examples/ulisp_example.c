@@ -26,6 +26,38 @@ void print_list_end( void *cc ) {
     fprintf(stdout, ")");
 }
 
+/*void apply_primop( struct ulisp *l*/
+/*                 , struct ucell *cell) {*/
+
+
+/*    switch(arity) {*/
+/*        case 0:*/
+/*            assert(0);*/
+/*            break;*/
+
+/*        case 1:*/
+/*            primop(car(cell));*/
+/*            assert(0);*/
+/*            break;*/
+
+/*        case 2:*/
+/*            primop( car(cell)*/
+/*                  , car(cdr(cell))*/
+/*                  );*/
+/*            assert(0);*/
+/*            break;*/
+
+/*        case 3:*/
+/*            primop( car(cell)*/
+/*                  , car(cdr(cell))*/
+/*                  , car(cdr(cdr(cell)))*/
+/*                  );*/
+/*            assert(0);*/
+/*            break;*/
+/*    }*/
+
+/*}*/
+
 int main(int argc, char *argv[]) {
 
     char ulisp_mem[ulisp_size()];
@@ -36,7 +68,6 @@ int main(int argc, char *argv[]) {
                                   , example_alloc
                                   , example_dealloc
                                   );
-
 
     assert( u );
 
@@ -49,11 +80,16 @@ int main(int argc, char *argv[]) {
                               , .on_nil        = print_nil
                               };
 
+/*    struct ucell *cell = list(u, primop(u, "+", op_add, 2, INTEGER, INTEGER)*/
+/*                               , nil*/
+/*                             )*/
+
     struct ucell *cell = list(u, mkatom(u, "some-atom")
                                , mkinteger(u, 42)
                                , mkinteger(u, 43)
                                , mkinteger(u, 44)
                                , mkinteger(u, 45)
+                               , mkinteger(u, 46)
                                , mkcstring(u, "TESTSTRING1")
                                , mkcstring(u, "TESTSTRING1")
                                , mkcstring(u, "TESTSTRING1")

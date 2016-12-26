@@ -33,6 +33,8 @@ struct ucell* list(struct ulisp *l, ...);
 struct ucell* string(struct ulisp *l, struct stringreader *sl);
 struct ucell* atom(struct ulisp *l, struct stringreader *sl);
 
+/*struct ucell* primop(struct ulisp *l, struct ucell *atom, */
+
 struct ucell* car( struct ucell *cell );
 struct ucell* cdr( struct ucell *cell );
 
