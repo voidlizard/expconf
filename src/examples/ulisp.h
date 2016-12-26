@@ -13,7 +13,6 @@ typedef enum {
 struct ulisp;
 struct ucell;
 
-
 size_t ulisp_size();
 
 struct ulisp *ulisp_create( void *mem
@@ -31,6 +30,9 @@ struct ucell* cons( struct ulisp *l
 
 struct ucell* list(struct ulisp *l, ...);
 
+struct ucell* string(struct ulisp *l, struct stringreader *sl);
+struct ucell* atom(struct ulisp *l, struct stringreader *sl);
+
 struct ucell* car( struct ucell *cell );
 struct ucell* cdr( struct ucell *cell );
 
@@ -38,11 +40,23 @@ struct ucell* cdr( struct ucell *cell );
 #define isnil(c) ((c) == nil)
 #define mkinteger(u, iv) cons((u), INTEGER, (void*)iv, nil)
 
+static inline struct ucell* mkcstring(struct ulisp *u, void *cs) {
+    struct cstring_reader csrd;
+    return string(u, mk_cstring_reader(&csrd, cs));
+}
+
+static inline struct ucell* mkatom(struct ulisp *u, void *cs) {
+    struct cstring_reader csrd;
+    return atom(u, mk_cstring_reader(&csrd, cs));
+}
+
 struct ucell_walk_cb {
     void *cc;
     void (*on_list_start)(void *cc);
     void (*on_list_end)(void *cc);
     void (*on_integer)(void *cc, integer data);
+    void (*on_string)(void *cc, size_t l, const char *cstr);
+    void (*on_atom)(void *cc, size_t l, const char *cstr);
     void (*on_nil)(void *cc);
 };
 

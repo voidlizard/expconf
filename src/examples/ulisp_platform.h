@@ -4,6 +4,7 @@
 #include "ulisp_platform_default.h"
 
 #include "allocators.h"
+#include "stringlike.h"
 
 #define safeappv(e, ...) (e)(__VA_ARGS__)
 

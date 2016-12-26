@@ -7,7 +7,9 @@ endif
 
 ALLEXECUTABLES=
 
+ifeq "$(MISCDATA_DIR)" ""
 MISCDATA_DIR=$(TOP)/contrib/miscdata
+endif
 
 INCDIRS+=$(TOP)
 
