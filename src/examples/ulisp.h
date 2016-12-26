@@ -13,7 +13,6 @@ typedef enum {
 struct ulisp;
 struct ucell;
 
-#define nil ((void*)0)
 
 size_t ulisp_size();
 
@@ -30,8 +29,14 @@ struct ucell* cons( struct ulisp *l
                   , void *car
                   , struct ucell *cdr );
 
+struct ucell* list(struct ulisp *l, ...);
+
 struct ucell* car( struct ucell *cell );
 struct ucell* cdr( struct ucell *cell );
+
+#define nil ((void*)0)
+#define isnil(c) ((c) == nil)
+#define mkinteger(u, iv) cons((u), INTEGER, (void*)iv, nil)
 
 struct ucell_walk_cb {
     void *cc;

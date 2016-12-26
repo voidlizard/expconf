@@ -1,6 +1,7 @@
 #include "ulisp.h"
 
 #include <string.h>
+#include <stdarg.h>
 
 struct ulisp {
 
@@ -47,6 +48,35 @@ struct ucell* cons( struct ulisp *l
     };
 
     return cell;
+}
+
+struct ucell* list(struct ulisp *l, ...) {
+    va_list ap;
+    va_start(ap, l);
+
+    size_t i = 0;
+
+    struct ucell *head = nil;
+    struct ucell *curr = nil;
+
+    for(;i < ULISP_LIST_LIT_MAX; i++ ) {
+        struct ucell *c = va_arg(ap, struct ucell*);
+        if( isnil(c) ) {
+            break;
+        }
+
+        if( isnil(head) ) {
+            curr = head = c;
+            continue;
+        }
+
+        curr->cdr = c;
+        curr = curr->cdr;
+    }
+
+    va_end(ap);
+
+    return head;
 }
 
 struct ucell* car( struct ucell *cell ) {

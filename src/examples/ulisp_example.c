@@ -39,7 +39,11 @@ int main(int argc, char *argv[]) {
                               , .on_nil        = print_nil
                               };
 
-    struct ucell *cell = cons(u, INTEGER, (void*)42,  cons(u, INTEGER, (void*)43, nil) );
+    struct ucell *cell = list(u, mkinteger(u, 42)
+                               , mkinteger(u, 43)
+                               , mkinteger(u, 44)
+                               , mkinteger(u, 45)
+                               , nil);
 
     ucell_walk(u, cell, &cb);
     fprintf(stdout, "\n\n");
