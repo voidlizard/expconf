@@ -17,6 +17,7 @@ EXPCONF_SOURCES+= exp_tokenize.c
 EXPCONF_SOURCES+= strchunk.c
 
 ULISP_SOURCES+=ulisp.c
+EX_BIND_SOURCES+=ex_bind.c
 
 EXAMPLES_COMMON_SOURCES+=examples_common.c
 
@@ -33,6 +34,7 @@ $(eval $(call add_source_dir,  $(EXPCONF_DIR), $(EXPCONF_SOURCES)))
 $(eval $(call ExecFile,tokenize, $(TOKENIZE_SOURCES) $(ALLSOURCES)))
 $(eval $(call ExecFile,parse1, $(PARSE1_SOURCES) $(ALLSOURCES)))
 $(eval $(call ExecFile,ulisp_example, $(UCLISP_SOURCES) $(ALLSOURCES)))
+$(eval $(call ExecFile,ex_bind, $(EX_BIND_SOURCES) $(ALLSOURCES)))
 
 all: $(ALLEXECUTABLES)
 
