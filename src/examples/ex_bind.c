@@ -1,6 +1,12 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+
+#include "cpp_sodomy.h"
+
+#undef ISEP
+#define ISEP ,
 
 typedef union {
     void *vp;
@@ -71,6 +77,7 @@ typedef enum {
 } argtype;
 
 struct binding {
+    void   *callee_cc;
     void   *callee;
     uint8_t arity;
     uint8_t targs[MAX_ARGS+1];
@@ -120,88 +127,69 @@ static inline cell_t wrap_arg(argtype t, void *val) {
     return v;
 }
 
+static inline void * unwrap_arg(argtype t, cell_t val) {
+    return val.vp;
+}
+
+void print0(void *cc) {
+    fprintf(stdout, "\n");
+}
 
 void print_cs(void *cc, char *s) {
     fprintf(stdout, "%s\n", s);
 }
 
-void* print_cs_wrap(void *cc, cell_t arg1) {
-    print_cs(cc, arg1.cs);
-    return 0;
+int succ(void *cc, int a) {
+    return a + 1;
 }
 
-void* print_cs2_wrap(void *cc, cell_t arg1, cell_t arg2) {
-    fprintf(stdout, "%s%s\n", arg1.cs, arg2.cs);
-    return 0;
+int sum(void *cc, int a, int b) {
+    return a + b;
 }
 
-void* print_cs3_wrap(void *cc, cell_t arg1, cell_t arg2, cell_t arg3) {
-    fprintf(stdout, "%s%s%s\n", arg1.cs, arg2.cs, arg3.cs);
-    return 0;
+#define RET_void(exp) do { exp; return (cell_t)(void*)0; } while(0)
+#define RET_int(exp)  do { cell_t r = { .i = exp }; return r; } while(0)
+
+#define RET_long      RET_int
+
+/*#define WRAPPED_ARGS(...) WRAPPED_ARGS_(VA_LENGTH(__VA_ARGS__))*/
+/*#define WRAPPED_ARGS_(n)  WRAPPED_ARGS__(n)*/
+/*#define WRAPPED_ARGS__(n) _WRAPPED_ARGS_##n*/
+/*#define _WRAPPED_ARGS_0*/
+/*#define _WRAPPED_ARGS_1 , cell_t c1*/
+/*#define _WRAPPED_ARGS_2 _WRAPPED_ARGS_1, cell_t c2*/
+/*#define _WRAPPED_ARGS_3 _WRAPPED_ARGS_2, cell_t c3*/
+/*#define _WRAPPED_ARGS_4 _WRAPPED_ARGS_3, cell_t c4*/
+/*#define _WRAPPED_ARGS_5 _WRAPPED_ARGS_4, cell_t c5*/
+/*#define _WRAPPED_ARGS_6 _WRAPPED_ARGS_5, cell_t c6*/
+/*#define _WRAPPED_ARGS_7 _WRAPPED_ARGS_6, cell_t c7*/
+/*#define _WRAPPED_ARGS_8 _WRAPPED_ARGS_7, cell_t c8*/
+/*#define _WRAPPED_ARGS_9 _WRAPPED_ARGS_8, cell_t c9*/
+/*#define _WRAPPED_ARGS_10 _WRAPPED_ARGS_9, cell_t c10*/
+
+#define WA(x) x
+#define WRAPPED_ARGS(...) IFNOTNULL(PUTSEP,__VA_ARGS__) ITERATE(WA, __VA_ARGS__)
+
+#define DECL_WRAPPER(fun, ret, ...) \
+static cell_t fun##__wrapper(void *cc WRAPPED_ARGS(__VA_ARGS__) ) {\
+    struct binding *b = cc;\
+    ret (*fn)(void*,##__VA_ARGS__) = b->callee;\
+    RET_##ret(fn(b->callee_cc));\
 }
 
-void* print_cs4_wrap(void *cc, cell_t arg1, cell_t arg2, cell_t arg3, cell_t arg4) {
-    fprintf(stdout, "%s%s%s%s\n", arg1.cs, arg2.cs, arg3.cs, arg4.cs);
-    return 0;
-}
+#define P(x) X##x
+#define JOPA(...) IFNOTNULL(PUTSEP,__VA_ARGS__) ITERATE(P, __VA_ARGS__)
+
+VA_LENGTH(): JOPA()
+VA_LENGTH(1): JOPA(1)
+VA_LENGTH(1,2,3): JOPA(1,2,3)
+
+DECL_WRAPPER(succ, int, int)
 
 int main(int argc, char *argv[]) {
 
-    struct binding bs[] = {   { .callee = print_cs_wrap
-                              , .arity = 1
-                              , .targs[0] = AT_CSTRING
-                              , .targs[1] = AT_VOID
-                              }
-                            , { .callee = print_cs2_wrap
-                              , .arity = 2
-                              , .targs[0] = AT_CSTRING
-                              , .targs[1] = AT_CSTRING
-                              , .targs[2] = AT_VOID
-                              }
-                            , { .callee = print_cs3_wrap
-                              , .arity = 3
-                              , .targs[0] = AT_CSTRING
-                              , .targs[1] = AT_CSTRING
-                              , .targs[2] = AT_CSTRING
-                              , .targs[3] = AT_VOID
-                              }
-                            , { .callee = print_cs4_wrap
-                              , .arity = 4
-                              , .targs[0] = AT_CSTRING
-                              , .targs[1] = AT_CSTRING
-                              , .targs[2] = AT_CSTRING
-                              , .targs[3] = AT_CSTRING
-                              , .targs[3] = AT_VOID
-                              }
-                          };
-
-
-    struct vlist v3 = { .next = 0
-                      , .val = wrap_string("TRESKI")
-                      };
-
-    struct vlist v2 = { .next = &v3
-                      , .val = wrap_string("PECHEN")
-                      };
-
-    struct vlist v1 = { .next = &v2
-                      , .val = wrap_string("KITA")
-                      };
-
-    struct vlist v0 = { .next = &v1
-                      , .val = wrap_string("JOPA")
-                      };
-
-    call_with_arglist(0, &bs[0], &v0);
-    call_with_arglist(0, &bs[1], &v0);
-    call_with_arglist(0, &bs[2], &v0);
-    call_with_arglist(0, &bs[3], &v0);
-
+    struct binding bs[] = { } ;
     return 0;
 }
-
-
-
-
 
 
