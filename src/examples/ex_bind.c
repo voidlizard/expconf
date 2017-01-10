@@ -177,7 +177,7 @@ static cell_t fun##__wrapper(void *cc WRAPPED_ARGS(__VA_ARGS__) ) {\
     RET_##ret(fn(b->callee_cc));\
 }
 
-#define P(x) X##x
+#define P(n,x) X##x##_##n
 #define JOPA(...) IFNOTNULL(PUTSEP,__VA_ARGS__) ITERATE(P, __VA_ARGS__)
 
 VA_LENGTH(): JOPA()
