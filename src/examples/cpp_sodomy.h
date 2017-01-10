@@ -38,4 +38,19 @@
 #define PUTSEP(...) PUTSEP_(__VA_ARGS__)
 #define PUTSEP_(...) __VA_ARGS__
 
+#define APPEND(x,...) APPEND___(VA_LENGTH(__VA_ARGS__),x,__VA_ARGS__)
+#define APPEND___(n,x,...) APPEND_(n,x,__VA_ARGS__)
+#define APPEND_(n,x,...) APPEND__##n(x,__VA_ARGS__)
+#define APPEND__0(x,...) x
+#define APPEND__1(x,...) __VA_ARGS__,x
+#define APPEND__2(x,...) __VA_ARGS__,x
+#define APPEND__3(x,...) __VA_ARGS__,x
+#define APPEND__4(x,...) __VA_ARGS__,x
+#define APPEND__5(x,...) __VA_ARGS__,x
+#define APPEND__6(x,...) __VA_ARGS__,x
+#define APPEND__7(x,...) __VA_ARGS__,x
+#define APPEND__8(x,...) __VA_ARGS__,x
+#define APPEND__9(x,...) __VA_ARGS__,x
+#define APPEND__10(x,...) __VA_ARGS__,x
+
 #endif

@@ -69,6 +69,9 @@ typedef cell_t (*ubound_fun_10)(void*, ARG_LIST_10);
 struct smth {
 };
 
+typedef char* cstring;
+typedef char* cstr;
+
 typedef enum {
     AT_INT
   , AT_CSTRING
@@ -76,9 +79,14 @@ typedef enum {
   , AT_VOID
 } argtype;
 
+typedef struct {
+    void *cc;
+    void *callee;
+} callee_t;
+
 struct binding {
-    void   *callee_cc;
-    void   *callee;
+    void    *wrapper;
+    callee_t callee;
     uint8_t arity;
     uint8_t targs[MAX_ARGS+1];
 };
@@ -89,7 +97,7 @@ struct vlist {
     cell_t val;
 };
 
-#define CALLN(N, b, cc, args) ((ubound_fun_##N)(b)->callee)((cc) VL##N(args))
+#define CALLN(N, b, args) ((ubound_fun_##N)(b)->wrapper)((b) VL##N(args))
 
 cell_t call_with_arglist( void *cc
                         , struct binding *b
@@ -98,17 +106,17 @@ cell_t call_with_arglist( void *cc
     cell_t nil = { .vp = 0 };
 
     switch( b->arity ) {
-        case 0: return CALLN(0, b, cc, al);
-        case 1: return CALLN(1, b, cc, al);
-        case 2: return CALLN(2, b, cc, al);
-        case 3: return CALLN(3, b, cc, al);
-        case 4: return CALLN(4, b, cc, al);
-        case 5: return CALLN(5, b, cc, al);
-        case 6: return CALLN(6, b, cc, al);
-        case 7: return CALLN(7, b, cc, al);
-        case 8: return CALLN(8, b, cc, al);
-        case 9: return CALLN(9, b, cc, al);
-        case 10: return CALLN(10, b, cc, al);
+        case 0: return CALLN(0, b, al);
+        case 1: return CALLN(1, b, al);
+        case 2: return CALLN(2, b, al);
+        case 3: return CALLN(3, b, al);
+        case 4: return CALLN(4, b, al);
+        case 5: return CALLN(5, b, al);
+        case 6: return CALLN(6, b, al);
+        case 7: return CALLN(7, b, al);
+        case 8: return CALLN(8, b, al);
+        case 9: return CALLN(9, b, al);
+        case 10: return CALLN(10, b, al);
         default:
              fprintf(stderr, "bad arity\n");
              exit(-1);
@@ -117,19 +125,71 @@ cell_t call_with_arglist( void *cc
     return nil;
 }
 
-static inline cell_t wrap_string(char *s) {
-    cell_t c = { .cs = s };
-    return c;
-}
 
-static inline cell_t wrap_arg(argtype t, void *val) {
-    cell_t v = { .vp = 0 };
-    return v;
-}
+#define RET_void(exp)    do { exp; return (cell_t)(void*)0; } while(0)
+#define RET_int(exp)     do { cell_t r = { .i = exp }; return r; } while(0)
+#define RET_object(exp)  do { cell_t r = { .vp = exp }; return r; } while(0)
+#define RET_cstring(exp) do { cell_t r = { .cs = exp }; return r; } while(0)
 
-static inline void * unwrap_arg(argtype t, cell_t val) {
-    return val.vp;
-}
+#define RET_long(exp) RET_int(exp)
+
+#define RET_ptr(exp) RET_object(exp)
+#define RET_voidptr(exp) RET_object(exp)
+
+#define RET_string(exp) RET_cstring(exp)
+#define RET_str(exp) RET_cstring(exp)
+#define RET_cstr(exp) RET_cstring(exp)
+#define RET_pchar(exp) RET_pchar(exp)
+
+#define WA(n,x) cell_t c##n
+#define WRAPPED_ARGS(...) IFNOTNULL(PUTSEP,__VA_ARGS__) ITERATE(WA, __VA_ARGS__)
+
+#define UA(n,t) UA_(c##n, t)
+#define UA_(v, t) UA__(v,t)
+#define UA__(v, t) _UA_##t(v)
+
+#define _UA_cstring(v) v.cs
+#define _UA_cstr(v) v.cs
+#define _UA_int(v) v.i
+#define _UA_object(v) v.vp
+#define _UA_pchar(v) v.cs
+#define _UA_ptr(v) v.vp
+#define _UA_pvoid(v) v.vp
+#define _UA_string(v) v.cs
+#define _UA_str(v) v.cs
+#define _UA_voidptr(v) v.vp
+
+#define UNWRAPPED_ARGS(...) IFNOTNULL(PUTSEP,__VA_ARGS__) ITERATE(UA, __VA_ARGS__)
+
+#define WRAPPER_NAME(fun) __wrap_##fun
+
+#define BIND_VAR_NAME(fun) __bind_var_##fun
+
+#define TYPE_TAG(n,t) TTAG_(t)
+#define TTAG_(t) TTAG__##t
+
+#define TTAG__void AT_VOID
+#define TTAG__int  AT_INT
+#define TTAG__string AT_CSTRING
+#define TTAG__cstring AT_CSTRING
+#define TTAG__pchar AT_CSTRING
+#define TTAG__object AT_OBJECT
+#define TTAG__pvoid  AT_OBJECT
+#define TTAG__ptr AT_OBJECT
+
+#define BIND(fun, ret, ...) \
+static cell_t WRAPPER_NAME(fun)(void *cc WRAPPED_ARGS(__VA_ARGS__) ) {\
+    struct binding *b = cc;\
+    ret (*fn)(void*,##__VA_ARGS__) = b->callee.callee;\
+    RET_##ret(fn(b->callee.cc UNWRAPPED_ARGS(__VA_ARGS__) ));\
+} \
+\
+static struct binding BIND_VAR_NAME(fun) =\
+{ .wrapper = WRAPPER_NAME(fun)\
+, .callee  = { .cc = 0, .callee = fun }\
+, .arity   = VA_LENGTH(__VA_ARGS__) \
+, .targs   = { ITERATE(TYPE_TAG, APPEND(ret,__VA_ARGS__)) }\
+};\
 
 void print0(void *cc) {
     fprintf(stdout, "\n");
@@ -144,52 +204,40 @@ int succ(void *cc, int a) {
 }
 
 int sum(void *cc, int a, int b) {
+    fprintf(stderr, "debug: sum %d %d is %d\n", a, b, a+b);
     return a + b;
 }
 
-#define RET_void(exp) do { exp; return (cell_t)(void*)0; } while(0)
-#define RET_int(exp)  do { cell_t r = { .i = exp }; return r; } while(0)
-
-#define RET_long      RET_int
-
-/*#define WRAPPED_ARGS(...) WRAPPED_ARGS_(VA_LENGTH(__VA_ARGS__))*/
-/*#define WRAPPED_ARGS_(n)  WRAPPED_ARGS__(n)*/
-/*#define WRAPPED_ARGS__(n) _WRAPPED_ARGS_##n*/
-/*#define _WRAPPED_ARGS_0*/
-/*#define _WRAPPED_ARGS_1 , cell_t c1*/
-/*#define _WRAPPED_ARGS_2 _WRAPPED_ARGS_1, cell_t c2*/
-/*#define _WRAPPED_ARGS_3 _WRAPPED_ARGS_2, cell_t c3*/
-/*#define _WRAPPED_ARGS_4 _WRAPPED_ARGS_3, cell_t c4*/
-/*#define _WRAPPED_ARGS_5 _WRAPPED_ARGS_4, cell_t c5*/
-/*#define _WRAPPED_ARGS_6 _WRAPPED_ARGS_5, cell_t c6*/
-/*#define _WRAPPED_ARGS_7 _WRAPPED_ARGS_6, cell_t c7*/
-/*#define _WRAPPED_ARGS_8 _WRAPPED_ARGS_7, cell_t c8*/
-/*#define _WRAPPED_ARGS_9 _WRAPPED_ARGS_8, cell_t c9*/
-/*#define _WRAPPED_ARGS_10 _WRAPPED_ARGS_9, cell_t c10*/
-
-#define WA(x) x
-#define WRAPPED_ARGS(...) IFNOTNULL(PUTSEP,__VA_ARGS__) ITERATE(WA, __VA_ARGS__)
-
-#define DECL_WRAPPER(fun, ret, ...) \
-static cell_t fun##__wrapper(void *cc WRAPPED_ARGS(__VA_ARGS__) ) {\
-    struct binding *b = cc;\
-    ret (*fn)(void*,##__VA_ARGS__) = b->callee;\
-    RET_##ret(fn(b->callee_cc));\
-}
-
-#define P(n,x) X##x##_##n
-#define JOPA(...) IFNOTNULL(PUTSEP,__VA_ARGS__) ITERATE(P, __VA_ARGS__)
-
-VA_LENGTH(): JOPA()
-VA_LENGTH(1): JOPA(1)
-VA_LENGTH(1,2,3): JOPA(1,2,3)
-
-DECL_WRAPPER(succ, int, int)
+BIND(succ, int, int)
+BIND(sum, int, int, int)
+BIND(print0, void)
+BIND(print_cs, void, cstring)
 
 int main(int argc, char *argv[]) {
 
-    struct binding bs[] = { } ;
+    struct binding *bs[] = { &BIND_VAR_NAME(print_cs)
+                           , &BIND_VAR_NAME(print0)
+                           , &BIND_VAR_NAME(sum)
+                           };
+
+    struct vlist vl0 = { .next = 0
+                       , .val.cs = "JOPA"
+                       };
+
+    struct vlist i2  = { .next = 0
+                       , .val.i = 3
+                       };
+
+    struct vlist i1  = { .next = &i2
+                       , .val.i = 2
+                       };
+
+    call_with_arglist( 0, bs[0], &vl0 );
+    call_with_arglist( 0, bs[1], &i1 );
+
+    cell_t rs = call_with_arglist( 0, bs[2], &i1 );
+    fprintf(stdout, "got cell %d\n", rs.i);
+
     return 0;
 }
-
 
