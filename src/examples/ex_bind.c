@@ -139,7 +139,7 @@ cell_t call_with_arglist( void *cc
 #define RET_string(exp) RET_cstring(exp)
 #define RET_str(exp) RET_cstring(exp)
 #define RET_cstr(exp) RET_cstring(exp)
-#define RET_pchar(exp) RET_pchar(exp)
+#define RET_pchar(exp) RET_cstring(exp)
 
 #define WA(n,x) cell_t c##n
 #define WRAPPED_ARGS(...) IFNOTNULL(PUTSEP,__VA_ARGS__) ITERATE(WA, __VA_ARGS__)
@@ -177,7 +177,11 @@ cell_t call_with_arglist( void *cc
 #define TTAG__pvoid  AT_OBJECT
 #define TTAG__ptr AT_OBJECT
 
-#define BIND(fun, ret, ...) \
+
+#define BIND(fun,ret,...) BIND_IMPL(fun,fun,ret,##__VA_ARGS__)
+#define BINDN(n,f,r,...) BIND_IMPL(n,f,r,##__VA_ARGS__)
+
+#define BIND_IMPL(name,fun, ret, ...) \
 static cell_t WRAPPER_NAME(fun)(void *cc WRAPPED_ARGS(__VA_ARGS__) ) {\
     struct binding *b = cc;\
     ret (*fn)(void*,##__VA_ARGS__) = b->callee.callee;\
@@ -190,6 +194,7 @@ static struct binding BIND_VAR_NAME(fun) =\
 , .arity   = VA_LENGTH(__VA_ARGS__) \
 , .targs   = { ITERATE(TYPE_TAG, APPEND(ret,__VA_ARGS__)) }\
 };\
+
 
 void print0(void *cc) {
     fprintf(stdout, "\n");
