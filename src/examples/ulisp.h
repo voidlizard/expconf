@@ -2,6 +2,7 @@
 #define __ulisp_h
 
 #include "ulisp_platform.h"
+#include "exp_tokenize.h"
 
 typedef enum {
      LIST
@@ -23,6 +24,21 @@ struct ulisp *ulisp_create( void *mem
 
 void ulisp_destroy( struct ulisp *ulisp );
 
+struct ulisp_parser;
+size_t ulisp_parser_size();
+
+struct ulisp_parser *ulisp_parser_create( void *mem
+                                        , size_t memsize
+                                        , read_char_fn readfn
+                                        , void *allocator
+                                        , alloc_function_t alloc
+                                        , dealloc_function_t dealloc
+                                        , struct ulisp *u );
+
+struct ucell *ulisp_parse( struct ulisp_parser *p, void *reader );
+
+void ulisp_parser_destroy( struct ulisp_parser *p );
+
 struct ucell* cons( struct ulisp *l
                   , ucell_type tp
                   , void *car
@@ -32,8 +48,6 @@ struct ucell* list(struct ulisp *l, ...);
 
 struct ucell* string(struct ulisp *l, struct stringreader *sl);
 struct ucell* atom(struct ulisp *l, struct stringreader *sl);
-
-/*struct ucell* primop(struct ulisp *l, struct ucell *atom, */
 
 struct ucell* car( struct ucell *cell );
 struct ucell* cdr( struct ucell *cell );

@@ -278,3 +278,110 @@ void ucell_walk( struct ulisp *ulisp
     safeappv(cb->on_list_end, cb->cc);
 }
 
+
+// parser
+
+struct ulisp_parser {
+    read_char_fn readfn;
+
+    void *allocator;
+    alloc_function_t alloc;
+    dealloc_function_t dealloc;
+    struct ulisp *u;
+
+    struct {
+        struct exp_token   mem;
+        struct exp_token  *curr;
+        struct exp_token  *back;
+    } token;
+
+    struct exp_tokenizer *tokenizer;
+
+};
+
+size_t ulisp_parser_size() {
+    return sizeof(struct ulisp_parser);
+}
+
+struct ulisp_parser *ulisp_parser_create( void *mem
+                                        , size_t memsize
+                                        , read_char_fn rfn
+                                        , void *allocator
+                                        , alloc_function_t alloc
+                                        , dealloc_function_t dealloc
+                                        , struct ulisp *u ) {
+
+    if( memsize < ulisp_parser_size() ) {
+        return 0;
+    }
+
+    struct ulisp_parser *p = mem;
+    *p = (struct ulisp_parser) { .readfn = rfn
+                               , .allocator = allocator
+                               , .alloc = alloc
+                               , .dealloc = dealloc
+                               , .u = u
+                               , .token = { 0 }
+                               , .tokenizer = 0
+                               };
+
+    return p;
+}
+
+static inline void destroy_tokenizer( struct ulisp_parser *p ) {
+    if( p->tokenizer ) {
+        exp_tokenizer_destroy(&p->tokenizer);
+    }
+}
+
+void ulisp_parser_destroy( struct ulisp_parser *p ) {
+    destroy_tokenizer(p);
+}
+
+static struct exp_token *token_get( struct ulisp_parser *p  ) {
+
+    if( p->token.back ) {
+        struct exp_token *tmp = p->token.back;
+        p->token.back = 0;
+        return tmp;
+    }
+
+    p->token.curr = exp_tokenizer_next(p->tokenizer, &p->token.mem);
+    return p->token.curr;
+}
+
+static void token_unget( struct ulisp_parser *p ) {
+    p->token.back = p->token.curr;
+}
+
+
+static void reset_tokenizer( struct ulisp_parser *p, void *reader ) {
+
+    destroy_tokenizer(p);
+
+    p->tokenizer = exp_tokenizer_create( p->allocator
+                                       , p->alloc
+                                       , p->dealloc
+                                       , reader
+                                       , p->readfn );
+
+}
+
+static struct ucell *parse_expr( struct ulisp_parser *p );
+
+static struct ucell *parse_list( struct ulisp_parser *p ) {
+    assert(0);
+}
+
+static struct ucell *parse_expr( struct ulisp_parser *p ) {
+    assert(0);
+}
+
+struct ucell *ulisp_parse( struct ulisp_parser *p, void *what ) {
+
+    fprintf(stderr, "ulisp_parse\n");
+
+    reset_tokenizer(p, what);
+
+    return parse_expr(p);
+}
