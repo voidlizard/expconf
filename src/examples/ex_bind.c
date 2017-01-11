@@ -97,7 +97,7 @@ struct vlist {
     cell_t val;
 };
 
-#define CALLN(N, b, args) ((ubound_fun_##N)(b)->wrapper)((b) VL##N(args))
+#define CALLN(N, b, cc, args) ((ubound_fun_##N)(b)->wrapper)((b) VL##N(args))
 
 cell_t call_with_arglist( void *cc
                         , struct binding *b
@@ -106,17 +106,17 @@ cell_t call_with_arglist( void *cc
     cell_t nil = { .vp = 0 };
 
     switch( b->arity ) {
-        case 0: return CALLN(0, b, al);
-        case 1: return CALLN(1, b, al);
-        case 2: return CALLN(2, b, al);
-        case 3: return CALLN(3, b, al);
-        case 4: return CALLN(4, b, al);
-        case 5: return CALLN(5, b, al);
-        case 6: return CALLN(6, b, al);
-        case 7: return CALLN(7, b, al);
-        case 8: return CALLN(8, b, al);
-        case 9: return CALLN(9, b, al);
-        case 10: return CALLN(10, b, al);
+        case 0: return CALLN(0, b, cc, al);
+        case 1: return CALLN(1, b, cc, al);
+        case 2: return CALLN(2, b, cc, al);
+        case 3: return CALLN(3, b, cc, al);
+        case 4: return CALLN(4, b, cc, al);
+        case 5: return CALLN(5, b, cc, al);
+        case 6: return CALLN(6, b, cc, al);
+        case 7: return CALLN(7, b, cc, al);
+        case 8: return CALLN(8, b, cc, al);
+        case 9: return CALLN(9, b, cc, al);
+        case 10: return CALLN(10, b, cc, al);
         default:
              fprintf(stderr, "bad arity\n");
              exit(-1);
