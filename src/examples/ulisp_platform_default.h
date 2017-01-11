@@ -10,4 +10,6 @@
 
 typedef ssize_t integer;
 
+#define pstacktmp(n) &(n){}
+
 #endif

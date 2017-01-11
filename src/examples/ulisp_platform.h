@@ -9,5 +9,7 @@
 #define safeappv(e, ...) (e)(__VA_ARGS__)
 
 #define ULISP_LIST_LIT_MAX 1024
+#define ULISP_PRIMOP_MAX_ARITY 8
+#define ULISP_ATOM_MAX 255
 
 #endif

@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include <chaos/preprocessor.h>
+
 #include "cpp_sodomy.h"
 
 #undef ISEP
@@ -16,16 +18,11 @@ typedef union {
 
 #define MAX_ARGS 10
 
-#define ARG_LIST_1 cell_t
-#define ARG_LIST_2 ARG_LIST_1, cell_t
-#define ARG_LIST_3 ARG_LIST_2, cell_t
-#define ARG_LIST_4 ARG_LIST_3, cell_t
-#define ARG_LIST_5 ARG_LIST_4, cell_t
-#define ARG_LIST_6 ARG_LIST_5, cell_t
-#define ARG_LIST_7 ARG_LIST_6, cell_t
-#define ARG_LIST_8 ARG_LIST_7, cell_t
-#define ARG_LIST_9 ARG_LIST_8, cell_t
-#define ARG_LIST_10 ARG_LIST_9, cell_t
+#define PUT_CELL_TYPE(...) cell_t
+#define WRAPPEDFUNTYPE(N) \
+(cell_t (*)( struct binding *b\
+           , void *cc CHAOS_PP_COMMA_IF(N)\
+                      CHAOS_PP_EXPR(CHAOS_PP_DELINEATE_FROM_TO_PARAMETRIC(0, N, CHAOS_PP_COMMA, PUT_CELL_TYPE, s))))
 
 #define NIL ((cell_t)(void*)0)
 #define CAR(x) ((x)?(x)->val:NIL)
@@ -54,18 +51,6 @@ typedef union {
 #define VL9(x)  VL8(x), CAR(CDR9(x))
 #define VL10(x) VL9(x), CAR(CDR10(x))
 
-typedef cell_t (*ubound_fun_0)(void*);
-typedef cell_t (*ubound_fun_1)(void*, ARG_LIST_1);
-typedef cell_t (*ubound_fun_2)(void*, ARG_LIST_2);
-typedef cell_t (*ubound_fun_3)(void*, ARG_LIST_3);
-typedef cell_t (*ubound_fun_4)(void*, ARG_LIST_4);
-typedef cell_t (*ubound_fun_5)(void*, ARG_LIST_5);
-typedef cell_t (*ubound_fun_6)(void*, ARG_LIST_6);
-typedef cell_t (*ubound_fun_7)(void*, ARG_LIST_7);
-typedef cell_t (*ubound_fun_8)(void*, ARG_LIST_8);
-typedef cell_t (*ubound_fun_9)(void*, ARG_LIST_9);
-typedef cell_t (*ubound_fun_10)(void*, ARG_LIST_10);
-
 struct smth {
 };
 
@@ -79,14 +64,9 @@ typedef enum {
   , AT_VOID
 } argtype;
 
-typedef struct {
-    void *cc;
-    void *callee;
-} callee_t;
-
 struct binding {
     void    *wrapper;
-    callee_t callee;
+    void    *callee;
     uint8_t arity;
     uint8_t targs[MAX_ARGS+1];
 };
@@ -97,7 +77,7 @@ struct vlist {
     cell_t val;
 };
 
-#define CALLN(N, b, cc, args) ((ubound_fun_##N)(b)->wrapper)((b) VL##N(args))
+#define CALLN(N, b, cc, args) (WRAPPEDFUNTYPE(N)(b)->wrapper)((b), (cc) VL##N(args))
 
 cell_t call_with_arglist( void *cc
                         , struct binding *b
@@ -182,22 +162,21 @@ cell_t call_with_arglist( void *cc
 #define BINDN(n,f,r,...) BIND_IMPL(n,f,r,##__VA_ARGS__)
 
 #define BIND_IMPL(name,fun, ret, ...) \
-static cell_t WRAPPER_NAME(fun)(void *cc WRAPPED_ARGS(__VA_ARGS__) ) {\
-    struct binding *b = cc;\
-    ret (*fn)(void*,##__VA_ARGS__) = b->callee.callee;\
-    RET_##ret(fn(b->callee.cc UNWRAPPED_ARGS(__VA_ARGS__) ));\
+static cell_t WRAPPER_NAME(fun)(struct binding *b, void *cc WRAPPED_ARGS(__VA_ARGS__) ) {\
+    ret (*fn)(void*,##__VA_ARGS__) = b->callee;\
+    RET_##ret(fn(cc UNWRAPPED_ARGS(__VA_ARGS__) ));\
 } \
 \
 static struct binding BIND_VAR_NAME(fun) =\
 { .wrapper = WRAPPER_NAME(fun)\
-, .callee  = { .cc = 0, .callee = fun }\
+, .callee  = fun\
 , .arity   = VA_LENGTH(__VA_ARGS__) \
 , .targs   = { ITERATE(TYPE_TAG, APPEND(ret,__VA_ARGS__)) }\
 };\
 
 
 void print0(void *cc) {
-    fprintf(stdout, "\n");
+    fprintf(stdout, "(%s)\n", cc ? (char*)cc : "");
 }
 
 void print_cs(void *cc, char *s) {
@@ -209,7 +188,8 @@ int succ(void *cc, int a) {
 }
 
 int sum(void *cc, int a, int b) {
-    fprintf(stderr, "debug: sum %d %d is %d\n", a, b, a+b);
+    int ctx = (int)(size_t)cc;
+    fprintf(stderr, "debug: sum %d %d is %d (%d)\n", a, b, a+b, ctx);
     return a + b;
 }
 
@@ -217,6 +197,7 @@ BIND(succ, int, int)
 BIND(sum, int, int, int)
 BIND(print0, void)
 BIND(print_cs, void, cstring)
+
 
 int main(int argc, char *argv[]) {
 
@@ -238,9 +219,9 @@ int main(int argc, char *argv[]) {
                        };
 
     call_with_arglist( 0, bs[0], &vl0 );
-    call_with_arglist( 0, bs[1], &i1 );
+    call_with_arglist( "CONTEXT!", bs[1], &i1 );
 
-    cell_t rs = call_with_arglist( 0, bs[2], &i1 );
+    cell_t rs = call_with_arglist( (void*)666, bs[2], &i1 );
     fprintf(stdout, "got cell %d\n", rs.i);
 
     return 0;

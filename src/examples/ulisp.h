@@ -1,17 +1,9 @@
 #ifndef __ulisp_h
 #define __ulisp_h
 
-#include "ulisp_platform.h"
-
-typedef enum {
-     LIST
-   , INTEGER
-   , ATOM
-   , STRING
-} ucell_type;
-
-struct ulisp;
-struct ucell;
+#include "ulisp_types.h"
+#include "ulisp_bind.h"
+#include "exp_tokenize.h"
 
 size_t ulisp_size();
 
@@ -23,34 +15,73 @@ struct ulisp *ulisp_create( void *mem
 
 void ulisp_destroy( struct ulisp *ulisp );
 
-struct ucell* cons( struct ulisp *l
-                  , ucell_type tp
-                  , void *car
-                  , struct ucell *cdr );
+void ulisp_bind(struct ulisp *u, ucell_t *bindlist);
 
-struct ucell* list(struct ulisp *l, ...);
+struct ulisp_parser;
+size_t ulisp_parser_size();
 
-struct ucell* string(struct ulisp *l, struct stringreader *sl);
-struct ucell* atom(struct ulisp *l, struct stringreader *sl);
+typedef enum {
+    ERR__UNBALANCED_PAREN
+  , ERR__INVALID_TOKEN
+} ulisp_parser_err;
 
-/*struct ucell* primop(struct ulisp *l, struct ucell *atom, */
+typedef void (*ulisp_parser_err_fn)(void *cc, ulisp_parser_err err, size_t lno, char *misc);
 
-struct ucell* car( struct ucell *cell );
-struct ucell* cdr( struct ucell *cell );
+const char *ulisp_parse_err_str(ulisp_parser_err err);
+
+struct ulisp_parser *ulisp_parser_create( void *mem
+                                        , size_t memsize
+                                        , read_char_fn readfn
+                                        , void *efn_cc
+                                        , ulisp_parser_err_fn efn
+                                        , void *allocator
+                                        , alloc_function_t alloc
+                                        , dealloc_function_t dealloc
+                                        , struct ulisp *u
+                                        );
+
+struct ucell *ulisp_parse( struct ulisp_parser *p, void *reader );
+struct ucell *ulisp_parse_top( struct ulisp_parser *p, void *what );
+
+void ulisp_parser_destroy( struct ulisp_parser *p );
+
+void ulisp_eval_top( struct ulisp *u, struct ucell *top );
+ucell_t *ulisp_eval_expr( struct ulisp *u, ucell_t *expr );
+
+struct ucell *umake(struct ulisp *u, ucell_type tp, size_t n, ...);
+
+struct ucell *umake_stringlike( struct ulisp *u
+                              , ucell_type tp
+                              , struct stringreader *rd );
+
+size_t ustring_length(struct ucell *us);
+const char *ustring_cstr(struct ucell *us);
 
 #define nil ((void*)0)
 #define isnil(c) ((c) == nil)
-#define mkinteger(u, iv) cons((u), INTEGER, (void*)iv, nil)
 
-static inline struct ucell* mkcstring(struct ulisp *u, void *cs) {
-    struct cstring_reader csrd;
-    return string(u, mk_cstring_reader(&csrd, cs));
-}
+#define setcar(cell, v) (cell)->data[0] = (v)
+#define setcdr(cell, v) (cell)->data[1] = (v)
+#define car(cell) (cell)->data[0]
+#define cdr(cell) (cell)->data[1]
 
-static inline struct ucell* mkatom(struct ulisp *u, void *cs) {
-    struct cstring_reader csrd;
-    return atom(u, mk_cstring_reader(&csrd, cs));
-}
+#define ucell_int(cell) ((integer)car((cell)))
+
+#define cstring(u, s) \
+umake_stringlike((u), STRING, mk_cstring_reader(pstacktmp(struct cstring_reader), (s)))
+
+#define atom(u, s) \
+umake_stringlike((u), ATOM, mk_cstring_reader(pstacktmp(struct cstring_reader), (s)))
+
+#define integer(u, i) umake((u), INTEGER, 1, (struct ucell*)(i))
+#define cons(u, a, b) umake((u), CONS, 2, (a), (b))
+
+#define bind(u,n,what) tuple((u), 2, atom((u), (n)), (what))
+
+#define primop(u, op) umake((u), PRIMOP, 1, (op))
+
+struct ucell *list(struct ulisp *u, ...);
+struct ucell *tuple(struct ulisp *u, size_t size, ...);
 
 struct ucell_walk_cb {
     void *cc;

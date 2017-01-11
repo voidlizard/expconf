@@ -2,6 +2,7 @@
 #define __stringlike_h
 
 #include <string.h>
+#include "strchunk.h"
 
 struct stringreader {
     void *cs;
@@ -37,9 +38,60 @@ static inline struct stringreader * mk_cstring_reader( struct cstring_reader *rd
 
     rd->p = s;
     rd->pe = &rd->p[strlen(s)];
-    rd->reader.cs = rd;
-    rd->reader.length = __cstring_reader_length;
-    rd->reader.readchar = __cstring_reader_readchar;
+    rd->reader = (struct stringreader){ .cs = rd
+                                      , .length = __cstring_reader_length
+                                      , .readchar = __cstring_reader_readchar
+                                      };
+
+    return &rd->reader;
+}
+
+struct strchunk_reader {
+    struct strchunk *chunk;
+    unsigned char   *cp;
+    struct stringreader reader;
+};
+
+static size_t __strchunk_length(void *rd_) {
+    struct strchunk_reader *rd = rd_;
+    return strchunk_length(rd->chunk);
+}
+
+static inline bool __strchunk_read_char(void *rd_, int *chr) {
+    struct strchunk_reader *rd = rd_;
+
+    do {
+
+        if( !rd->chunk ) break;
+
+        if( rd->cp >= rd->chunk->p ) {
+            rd->chunk = rd->chunk->next;
+            if( !rd->chunk ) break;
+            rd->cp = rd->chunk->data;
+        }
+
+        if( rd->cp && rd->cp < rd->chunk->p ) {
+            *chr = *rd->cp;
+            rd->cp++;
+        }
+
+        return true;
+
+    } while(0);
+
+    return false;
+}
+
+static inline struct stringreader * mk_strchunk_reader( struct strchunk_reader *rd
+                                                      , struct strchunk *c ) {
+    rd->chunk = c;
+    rd->cp = c->data;
+
+    rd->reader = (struct stringreader){ .cs = rd
+                                      , .length = __strchunk_length
+                                      , .readchar = __strchunk_read_char
+                                      };
+
     return &rd->reader;
 }
 

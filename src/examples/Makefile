@@ -6,6 +6,7 @@ include $(TOP)/make/top.mk
 # CFLAGS+=-c99
 
 MISCDATA_DIR:=$(TOP)/../../miscdata
+CHAOS_PP_DIR:=$(TOP)/../contrib/chaos-pp
 
 MISCDATA_SOURCES+=hash.c
 MISCDATA_SOURCES+=slist.c
@@ -26,6 +27,7 @@ PARSE1_SOURCES+=parse1.c $(EXAMPLES_COMMON_SOURCES)
 UCLISP_SOURCES+=ulisp_example.c $(ULISP_SOURCES) $(EXAMPLES_COMMON_SOURCES)
 
 $(eval $(call add_include_dir, $(MISCDATA_DIR)))
+$(eval $(call add_include_dir, $(CHAOS_PP_DIR)))
 $(eval $(call miscdata_sources, $(MISCDATA_SOURCES)))
 
 $(eval $(call add_include_dir, $(EXPCONF_DIR)))
@@ -41,6 +43,7 @@ all: $(ALLEXECUTABLES)
 show:
 	@echo $(TOP)
 	@echo $(MISCDATA_DIR)
+	@echo $(CHAOS_PP_DIR)
 	@echo $(ALLEXECUTABLES)
 
 clean_extra:

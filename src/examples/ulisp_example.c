@@ -1,64 +1,73 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+
 #include "ulisp.h"
 #include "examples_common.h"
 
 void print_nil( void *cc ) {
-    fprintf(stdout, "nil");
+    fprintf(stdout, "#nil");
 }
 
 void print_int( void *cc, integer v ) {
-    fprintf(stdout, "(int %ld)", v);
+    fprintf(stdout, "%ld ", v);
 }
 
 void print_str(void *cc, size_t len, const char *s) {
-    fprintf(stdout, "(string %ld \"%s\")", len, s);
+    fprintf(stdout, "\"%s\" ", s);
 }
 
 void print_atom(void *cc, size_t len, const char *s) {
-    fprintf(stdout, "(atom %s)", s);
+    fprintf(stdout, "%s ", s);
 }
 
 void print_list_start( void *cc ) {
-    fprintf(stdout, "(");
+    fprintf(stdout, "(cons ");
 }
 
 void print_list_end( void *cc ) {
-    fprintf(stdout, ")");
+    fprintf(stdout, ") ");
 }
 
-/*void apply_primop( struct ulisp *l*/
-/*                 , struct ucell *cell) {*/
+static void show_parse_error( void *cc
+                            , ulisp_parser_err err
+                            , size_t lno
+                            , char *misc) {
+
+    fprintf(stderr, "*** error (parse) %ld: %s\n", lno, ulisp_parse_err_str(err));
+}
 
 
-/*    switch(arity) {*/
-/*        case 0:*/
-/*            assert(0);*/
-/*            break;*/
+static struct ucell_walk_cb walk_cb = { .cc = 0
+                                      , .on_list_start = print_list_start
+                                      , .on_list_end   = print_list_end
+                                      , .on_integer    = print_int
+                                      , .on_atom       = print_atom
+                                      , .on_string     = print_str
+                                      , .on_nil        = print_nil
+                                      };
 
-/*        case 1:*/
-/*            primop(car(cell));*/
-/*            assert(0);*/
-/*            break;*/
+static ucell_t *__display( struct ulisp *u, ucell_t *rs ) {
+    fprintf(stdout, "%s\n", ustring_cstr(rs));
+    return nil;
+}
 
-/*        case 2:*/
-/*            primop( car(cell)*/
-/*                  , car(cdr(cell))*/
-/*                  );*/
-/*            assert(0);*/
-/*            break;*/
-
-/*        case 3:*/
-/*            primop( car(cell)*/
-/*                  , car(cdr(cell))*/
-/*                  , car(cdr(cdr(cell)))*/
-/*                  );*/
-/*            assert(0);*/
-/*            break;*/
-/*    }*/
-
-/*}*/
+static struct ulisp_primop  __primop_display = { .arity = 1
+                                               , .callee_cc = 0
+                                               , .callee = 0
+                                               , .wrapper = __display
+                                               , .tp = UNIT
+                                               , .argtp = { STRING }
+                                               };
 
 int main(int argc, char *argv[]) {
+
+    if( argc < 2 ) {
+        fprintf(stderr, "usage: ulisp_example file-name\n");
+        exit(1);
+    }
+
+    const char *fname = argv[1];
 
     char ulisp_mem[ulisp_size()];
 
@@ -69,39 +78,45 @@ int main(int argc, char *argv[]) {
                                   , example_dealloc
                                   );
 
+
     assert( u );
 
-    struct ucell_walk_cb cb = { .cc = 0
-                              , .on_list_start = print_list_start
-                              , .on_list_end   = print_list_end
-                              , .on_integer    = print_int
-                              , .on_atom       = print_atom
-                              , .on_string     = print_str
-                              , .on_nil        = print_nil
-                              };
+    struct ucell *binds = list(u, bind(u, "display", primop(u, &__primop_display))
+                                , bind(u, "__VERSION__", cstring(u, "ulisp 0.1.0-alpha"))
+                                , nil
+                              );
 
-/*    struct ucell *cell = list(u, primop(u, "+", op_add, 2, INTEGER, INTEGER)*/
-/*                               , nil*/
-/*                             )*/
+    ulisp_bind(u, binds);
 
-    struct ucell *cell = list(u, mkatom(u, "some-atom")
-                               , mkinteger(u, 42)
-                               , mkinteger(u, 43)
-                               , mkinteger(u, 44)
-                               , mkinteger(u, 45)
-                               , mkinteger(u, 46)
-                               , mkcstring(u, "TESTSTRING1")
-                               , mkcstring(u, "TESTSTRING1")
-                               , mkcstring(u, "TESTSTRING1")
-                               , mkcstring(u, "TESTSTRING1")
-                               , mkcstring(u, "TESTSTRING2")
-                               , mkcstring(u, "TESTSTRING3")
-                               , nil);
+    char pmem[ulisp_parser_size()];
 
-    ucell_walk(u, cell, &cb);
-    fprintf(stdout, "\n\n");
+    struct ulisp_parser *p = ulisp_parser_create( pmem
+                                                , sizeof(pmem)
+                                                , file_read_char
+                                                , 0
+                                                , show_parse_error
+                                                , 0
+                                                , example_alloc
+                                                , example_dealloc
+                                                , u );
 
+
+    FILE *file = fopen(fname, "rb");
+
+    if( !file ) {
+        fprintf(stderr, "*** fatal. %s: %s \n", fname, strerror(errno));
+        exit(-1);
+    }
+
+    struct ucell *top = ulisp_parse_top(p, file);
+
+    ulisp_eval_top(u, top);
+
+__exit:
+
+    ulisp_parser_destroy(p);
     ulisp_destroy(u);
+    fclose(file);
 
     return 0;
 }
