@@ -339,6 +339,10 @@ struct ulisp_parser *ulisp_parser_create( void *mem
                                , .on_err = efn
                                };
 
+
+    p->rdr.lno = 1;
+    p->rdr.eof = false;
+
     return p;
 }
 
@@ -374,6 +378,7 @@ static bool __lno_reader_wrapper( void *cc, unsigned char *c ) {
     bool ok = p->readfn(p->rdr.cc, &nc);
 
     if( !ok ) {
+        fprintf(stderr, "here: set eof\n");
         p->rdr.eof = true;
         return false;
     }
@@ -390,9 +395,6 @@ static bool __lno_reader_wrapper( void *cc, unsigned char *c ) {
 static void reset_tokenizer( struct ulisp_parser *p, void *reader ) {
 
     destroy_tokenizer(p);
-
-    p->rdr.lno = 1;
-    p->rdr.cc = reader;
 
     p->tokenizer = exp_tokenizer_create( p->allocator
                                        , p->alloc
@@ -427,6 +429,10 @@ static struct ucell *parse_expr( struct ulisp_parser *p, struct ucell *top ) {
     struct exp_token *tok = token_get(p);
     struct ulisp *u = p->u;
 
+    if( !tok ) {
+        return nil;
+    }
+
     switch( tok->tag ) {
         case TOK_INTEGER:
             return integer(u, tok->v.intval);
@@ -452,14 +458,43 @@ static struct ucell *parse_expr( struct ulisp_parser *p, struct ucell *top ) {
     return nil;
 }
 
-struct ucell *ulisp_parse( struct ulisp_parser *p, void *what ) {
-
-    fprintf(stderr, "ulisp_parse\n");
-
-    reset_tokenizer(p, what);
-
+static struct ucell *ulisp_parse_(struct ulisp_parser *p) {
     return parse_expr(p, list(p->u, nil));
 }
+
+struct ucell *ulisp_parse( struct ulisp_parser *p, void *what ) {
+    p->rdr.cc = what;
+    reset_tokenizer(p, what);
+    return ulisp_parse_(p);
+}
+
+struct ucell *ulisp_parse_top( struct ulisp_parser *p, void *what ) {
+
+    p->rdr.cc = what;
+    reset_tokenizer(p, what);
+
+    struct ulisp *u = p->u;
+    struct ucell *head = nil;
+    struct ucell *prev = nil;
+
+    while( !p->rdr.eof ) {
+        struct ucell *expr = ulisp_parse_(p);
+
+        if( !expr || p->rdr.eof ) {
+            break;
+        }
+
+        if( isnil(prev) ) {
+            head = prev = cons(u, expr, nil);
+        } else {
+            setcdr(prev, cons(u, expr, nil));
+            prev = cdr(prev);
+        }
+    }
+
+    return head;
+}
+
 
 const char *ulisp_parse_err_str(ulisp_parser_err err) {
     switch(err) {

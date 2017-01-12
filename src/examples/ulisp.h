@@ -48,6 +48,7 @@ struct ulisp_parser *ulisp_parser_create( void *mem
                                         );
 
 struct ucell *ulisp_parse( struct ulisp_parser *p, void *reader );
+struct ucell *ulisp_parse_top( struct ulisp_parser *p, void *what );
 
 void ulisp_parser_destroy( struct ulisp_parser *p );
 
