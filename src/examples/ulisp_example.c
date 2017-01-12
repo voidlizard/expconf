@@ -59,25 +59,22 @@ int main(int argc, char *argv[]) {
                               , .on_nil        = print_nil
                               };
 
-    struct ucell *cell = list(u, mkatom(u, "some-atom")
-                               , mkinteger(u, 42)
-                               , mkinteger(u, 43)
-                               , mkinteger(u, 44)
-                               , mkinteger(u, 45)
-                               , mkinteger(u, 46)
-                               , mkcstring(u, "TESTSTRING1")
-                               , mkcstring(u, "TESTSTRING1")
-                               , mkcstring(u, "TESTSTRING1")
-                               , mkcstring(u, "TESTSTRING1")
-                               , mkcstring(u, "TESTSTRING2")
-                               , mkcstring(u, "TESTSTRING3")
-                               , nil);
+/*    struct ucell *cell = list(u, mkatom(u, "some-atom")*/
+/*                               , mkinteger(u, 42)*/
+/*                               , mkinteger(u, 43)*/
+/*                               , mkinteger(u, 44)*/
+/*                               , mkinteger(u, 45)*/
+/*                               , mkinteger(u, 46)*/
+/*                               , mkcstring(u, "TESTSTRING1")*/
+/*                               , mkcstring(u, "TESTSTRING1")*/
+/*                               , mkcstring(u, "TESTSTRING1")*/
+/*                               , mkcstring(u, "TESTSTRING1")*/
+/*                               , mkcstring(u, "TESTSTRING2")*/
+/*                               , mkcstring(u, "TESTSTRING3")*/
+/*                               , nil);*/
 
-    ucell_walk(u, cell, &cb);
-    fprintf(stdout, "\n\n");
 
     char pmem[ulisp_parser_size()];
-
 
     struct ulisp_parser *p = ulisp_parser_create( pmem
                                                 , sizeof(pmem)
@@ -96,6 +93,8 @@ int main(int argc, char *argv[]) {
     }
 
     struct ucell *expr = ulisp_parse(p, file);
+    ucell_walk(u, expr, &cb);
+    fprintf(stdout, "\n");
 
 __exit:
 

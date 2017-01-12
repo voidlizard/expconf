@@ -5,6 +5,7 @@
 
 #include "hash.h"
 #include "hashfun_murmur.h"
+#include "stringlike.h"
 
 struct ulisp {
 
@@ -374,7 +375,21 @@ static struct ucell *parse_list( struct ulisp_parser *p ) {
 }
 
 static struct ucell *parse_expr( struct ulisp_parser *p ) {
-    assert(0);
+
+    struct exp_token *tok = token_get(p);
+    struct ulisp *u = p->u;
+
+    switch( tok->tag ) {
+        case TOK_INTEGER:
+            return mkinteger(u, tok->v.intval);
+
+        case TOK_STRING: {
+                struct strchunk_reader rd;
+                return string(u, mk_strchunk_reader(&rd,  tok->v.strval));
+        }
+    }
+
+    return nil;
 }
 
 struct ucell *ulisp_parse( struct ulisp_parser *p, void *what ) {
