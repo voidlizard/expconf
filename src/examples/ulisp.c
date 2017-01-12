@@ -7,6 +7,12 @@
 #include "hashfun_murmur.h"
 #include "stringlike.h"
 
+#define cstring_tok(u, s) \
+umake_stringlike((u), STRING, mk_strchunk_reader(pstacktmp(struct strchunk_reader), (s)))
+
+#define atom_tok(u, s) \
+umake_stringlike((u), ATOM, mk_strchunk_reader(pstacktmp(struct strchunk_reader), (s)))
+
 struct ulisp {
 
     struct hash *hstr;
@@ -378,56 +384,54 @@ static void reset_tokenizer( struct ulisp_parser *p, void *reader ) {
 static struct ucell *parse_expr( struct ulisp_parser *p, struct ucell *top );
 
 static struct ucell *parse_list( struct ulisp_parser *p ) {
-    assert(0);
-/*    struct ulisp *u = p->u;*/
-/*    struct exp_token *tok = token_get(p);*/
+    struct ulisp *u = p->u;
+    struct exp_token *tok = token_get(p);
 
-/*    if( !tok ) {*/
-/*        // FIXME: parse error, unclosed list?*/
-/*        assert(0);*/
-/*        return nil;*/
-/*    }*/
+    if( !tok ) {
+        // FIXME: parse error, unclosed list?
+        assert(0);
+        return nil;
+    }
 
-/*    if( tok->tag == TOK_CPAREN ) {*/
-/*        return nil;*/
-/*    }*/
+    if( tok->tag == TOK_CPAREN ) {
+        return nil;
+    }
 
-/*    token_unget(p);*/
-/*    struct ucell *car = parse_expr(p, nil);*/
-/*    car->cdr = parse_list(p);*/
-/*    return car;*/
+    token_unget(p);
+
+    struct ucell *car = parse_expr(p, nil);
+    return cons(u, car, parse_list(p));
 }
 
 static struct ucell *parse_expr( struct ulisp_parser *p, struct ucell *top ) {
-    assert(0);
-/*    struct exp_token *tok = token_get(p);*/
-/*    struct ulisp *u = p->u;*/
+    struct exp_token *tok = token_get(p);
+    struct ulisp *u = p->u;
 
-/*    switch( tok->tag ) {*/
-/*        case TOK_INTEGER:*/
-/*            return mkinteger(u, tok->v.intval);*/
+    switch( tok->tag ) {
+        case TOK_INTEGER:
+            return integer(u, tok->v.intval);
 
-/*        case TOK_STRING:*/
-/*            return mk_str_from_strchunk(u, tok->v.strval);*/
+        case TOK_STRING:
+            return cstring_tok(u, tok->v.strval);
 
-/*        case TOK_ATOM:*/
-/*            return mk_atom_from_strchunk(u, tok->v.atom);*/
+        case TOK_ATOM:
+            return atom_tok(u, tok->v.atom);
 
-/*        case TOK_OPAREN:*/
-/*            return parse_list(p);*/
+        case TOK_OPAREN:
+            return parse_list(p);
 
-/*        case TOK_CPAREN:*/
-/*            // TODO: error?*/
-/*            assert(0);*/
-/*            return nil;*/
+        case TOK_CPAREN:
+            // TODO: error?
+            assert(0);
+            return nil;
 
-/*        case TOK_ERROR:*/
-/*            // TODO: error?*/
-/*            assert(0);*/
-/*            return nil;*/
-/*    }*/
+        case TOK_ERROR:
+            // TODO: error?
+            assert(0);
+            return nil;
+    }
 
-/*    return nil;*/
+    return nil;
 }
 
 struct ucell *ulisp_parse( struct ulisp_parser *p, void *what ) {

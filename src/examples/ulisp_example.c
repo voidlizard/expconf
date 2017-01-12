@@ -69,33 +69,33 @@ int main(int argc, char *argv[]) {
     ucell_walk(u, cell, &cb);
     fprintf(stdout, "\n");
 
-/*    char pmem[ulisp_parser_size()];*/
+    char pmem[ulisp_parser_size()];
 
-/*    struct ulisp_parser *p = ulisp_parser_create( pmem*/
-/*                                                , sizeof(pmem)*/
-/*                                                , file_read_char*/
-/*                                                , 0*/
-/*                                                , example_alloc*/
-/*                                                , example_dealloc*/
-/*                                                , u );*/
+    struct ulisp_parser *p = ulisp_parser_create( pmem
+                                                , sizeof(pmem)
+                                                , file_read_char
+                                                , 0
+                                                , example_alloc
+                                                , example_dealloc
+                                                , u );
 
 
-/*    FILE *file = fopen(fname, "rb");*/
+    FILE *file = fopen(fname, "rb");
 
-/*    if( !file ) {*/
-/*        fprintf(stderr, "*** fatal. %s: %s \n", fname, strerror(errno));*/
-/*        exit(-1);*/
-/*    }*/
+    if( !file ) {
+        fprintf(stderr, "*** fatal. %s: %s \n", fname, strerror(errno));
+        exit(-1);
+    }
 
-/*    struct ucell *expr = ulisp_parse(p, file);*/
-/*    ucell_walk(u, expr, &cb);*/
-/*    fprintf(stdout, "\n");*/
+    struct ucell *expr = ulisp_parse(p, file);
+    ucell_walk(u, expr, &cb);
+    fprintf(stdout, "\n");
 
 __exit:
 
-/*    ulisp_parser_destroy(p);*/
+    ulisp_parser_destroy(p);
     ulisp_destroy(u);
-/*    fclose(file);*/
+    fclose(file);
 
     return 0;
 }
