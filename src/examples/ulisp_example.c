@@ -6,29 +6,28 @@
 #include "examples_common.h"
 
 void print_nil( void *cc ) {
-    fprintf(stdout, "nil");
+/*    fprintf(stdout, "#");*/
 }
 
 void print_int( void *cc, integer v ) {
-    fprintf(stdout, "(int %ld)", v);
+    fprintf(stdout, "%ld ", v);
 }
 
 void print_str(void *cc, size_t len, const char *s) {
-    fprintf(stdout, "(string %ld \"%s\")", len, s);
+    fprintf(stdout, "\"%s\" ", s);
 }
 
 void print_atom(void *cc, size_t len, const char *s) {
-    fprintf(stdout, "(atom %s)", s);
+    fprintf(stdout, "%s ", s);
 }
 
 void print_list_start( void *cc ) {
-    fprintf(stdout, "(");
+    fprintf(stdout, "(list ");
 }
 
 void print_list_end( void *cc ) {
-    fprintf(stdout, ")");
+    fprintf(stdout, ") ");
 }
-
 
 int main(int argc, char *argv[]) {
 
@@ -59,20 +58,16 @@ int main(int argc, char *argv[]) {
                               , .on_nil        = print_nil
                               };
 
-/*    struct ucell *cell = list(u, mkatom(u, "some-atom")*/
-/*                               , mkinteger(u, 42)*/
-/*                               , mkinteger(u, 43)*/
-/*                               , mkinteger(u, 44)*/
-/*                               , mkinteger(u, 45)*/
-/*                               , mkinteger(u, 46)*/
-/*                               , mkcstring(u, "TESTSTRING1")*/
-/*                               , mkcstring(u, "TESTSTRING1")*/
-/*                               , mkcstring(u, "TESTSTRING1")*/
-/*                               , mkcstring(u, "TESTSTRING1")*/
-/*                               , mkcstring(u, "TESTSTRING2")*/
-/*                               , mkcstring(u, "TESTSTRING3")*/
-/*                               , nil);*/
+    struct ucell *cell = list(u, mkatom(u, "a")
+                               , mkatom(u, "b")
+                               , list(u, mkinteger(u,1), mkinteger(u,2), nil)
+                               , mkatom(u, "end")
+                               , nil
+                               );
 
+    ucell_walk(u, cell, &cb);
+
+    fprintf(stdout, "\n");
 
     char pmem[ulisp_parser_size()];
 
