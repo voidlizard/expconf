@@ -355,6 +355,13 @@ static void token_unget( struct ulisp_parser *p ) {
     p->token.back = p->token.curr;
 }
 
+static inline struct ucell *mk_from_strchunk( struct ulisp *u
+                                            , struct strchunk *cs) {
+    return string( u
+                 , mk_strchunk_reader( pstacktmp(struct strchunk_reader)
+                                     , cs ));
+}
+
 
 static void reset_tokenizer( struct ulisp_parser *p, void *reader ) {
 
@@ -367,6 +374,7 @@ static void reset_tokenizer( struct ulisp_parser *p, void *reader ) {
                                        , p->readfn );
 
 }
+
 
 static struct ucell *parse_expr( struct ulisp_parser *p );
 
@@ -383,10 +391,11 @@ static struct ucell *parse_expr( struct ulisp_parser *p ) {
         case TOK_INTEGER:
             return mkinteger(u, tok->v.intval);
 
-        case TOK_STRING: {
-                struct strchunk_reader rd;
-                return string(u, mk_strchunk_reader(&rd,  tok->v.strval));
-        }
+        case TOK_STRING:
+                return mk_from_strchunk(u, tok->v.strval);
+
+        case TOK_ATOM:
+                return mk_from_strchunk(u, tok->v.atom);
     }
 
     return nil;
