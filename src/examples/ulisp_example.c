@@ -6,7 +6,7 @@
 #include "examples_common.h"
 
 void print_nil( void *cc ) {
-/*    fprintf(stdout, "#");*/
+    fprintf(stdout, "#nil");
 }
 
 void print_int( void *cc, integer v ) {
@@ -22,7 +22,7 @@ void print_atom(void *cc, size_t len, const char *s) {
 }
 
 void print_list_start( void *cc ) {
-    fprintf(stdout, "(list ");
+    fprintf(stdout, "(cons ");
 }
 
 void print_list_end( void *cc ) {
@@ -58,34 +58,34 @@ int main(int argc, char *argv[]) {
                               , .on_nil        = print_nil
                               };
 
-    struct ucell *cell = list(u, mkatom(u, "a")
-                               , mkatom(u, "b")
-                               , list(u, mkinteger(u,1), mkinteger(u,2), nil)
-                               , mkatom(u, "end")
-                               , nil
-                               );
+    struct ucell *cell = list(u, integer(u, 1)
+                               , integer(u, 2)
+                               , integer(u, 3)
+                               , cstring(u, "JOPA")
+                               , list(u, atom(u, "A"), atom(u, "B"), nil)
+                               , atom(u, "end")
+                               , nil );
 
     ucell_walk(u, cell, &cb);
-
     fprintf(stdout, "\n");
 
-    char pmem[ulisp_parser_size()];
+/*    char pmem[ulisp_parser_size()];*/
 
-    struct ulisp_parser *p = ulisp_parser_create( pmem
-                                                , sizeof(pmem)
-                                                , file_read_char
-                                                , 0
-                                                , example_alloc
-                                                , example_dealloc
-                                                , u );
+/*    struct ulisp_parser *p = ulisp_parser_create( pmem*/
+/*                                                , sizeof(pmem)*/
+/*                                                , file_read_char*/
+/*                                                , 0*/
+/*                                                , example_alloc*/
+/*                                                , example_dealloc*/
+/*                                                , u );*/
 
 
-    FILE *file = fopen(fname, "rb");
+/*    FILE *file = fopen(fname, "rb");*/
 
-    if( !file ) {
-        fprintf(stderr, "*** fatal. %s: %s \n", fname, strerror(errno));
-        exit(-1);
-    }
+/*    if( !file ) {*/
+/*        fprintf(stderr, "*** fatal. %s: %s \n", fname, strerror(errno));*/
+/*        exit(-1);*/
+/*    }*/
 
 /*    struct ucell *expr = ulisp_parse(p, file);*/
 /*    ucell_walk(u, expr, &cb);*/
@@ -93,9 +93,9 @@ int main(int argc, char *argv[]) {
 
 __exit:
 
-    ulisp_parser_destroy(p);
+/*    ulisp_parser_destroy(p);*/
     ulisp_destroy(u);
-    fclose(file);
+/*    fclose(file);*/
 
     return 0;
 }

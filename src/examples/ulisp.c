@@ -17,164 +17,150 @@ struct ulisp {
     dealloc_function_t dealloc;
 };
 
-struct ustring {
-    char *s;
-    char *e;
-    char data[0];
-};
-
 struct ucell {
     ucell_type tp;
-    struct {
-        integer    integer;
-        struct ustring  *str;
-        struct ucell  *list;
-    } car;
-    struct ucell *cdr;
+    struct ucell *data[1];
+};
+
+struct ustring {
+    size_t len;
+    char data[0];
 };
 
 #define nil ((void*)0)
 
-struct ucell* cons( struct ulisp *l
-                  , ucell_type tp
-                  , void *car
-                  , struct ucell *cdr ) {
 
-    struct ucell *cell = l->alloc(l->allocator, sizeof(struct ucell));
+static struct ucell *ucell_alloc(struct ulisp *u, size_t bytes) {
 
-    if( !cell ) {
-        return nil;
-    }
+    if( bytes < sizeof(struct ucell) )
+        return 0;
+
+    return u->alloc(u->allocator, bytes);
+}
+
+struct ucell *umake(struct ulisp *u, ucell_type tp, size_t n, ...) {
+
+    if( n < 1 )
+        return 0;
+
+    const size_t ms = sizeof(struct ucell) + (n-1)*sizeof(struct ucell*);
+    struct ucell *cell = ucell_alloc(u, ms);
+
+    if( !cell )
+        return 0;
 
     cell->tp = tp;
-    cell->cdr = cdr;
 
-    switch( tp ) {
+    va_list ap;
+    va_start(ap, n);
 
-        case INTEGER:
-            cell->car.integer = (integer)car;
-            break;
+    size_t i = 0;
+    for(; i < n; i++ ) {
+        cell->data[i] = va_arg(ap, struct ucell*);
+    }
 
-        case ATOM:
-        case STRING:
-            cell->car.str = (struct ustring*)car;
-            break;
-
-        default:
-            cell->car.list = car;
-            break;
-    };
+    va_end(ap);
 
     return cell;
 }
 
-struct ucell* list(struct ulisp *l, ...) {
-    va_list ap;
-    va_start(ap, l);
 
-    size_t i = 0;
+struct ucell *list(struct ulisp *u, ...) {
+    va_list ap;
+    va_start(ap, u);
 
     struct ucell *head = nil;
-    struct ucell *curr = head;
+    struct ucell *prev = nil;
 
+    size_t i = 0;
     for(;i < ULISP_LIST_LIT_MAX; i++ ) {
         struct ucell *c = va_arg(ap, struct ucell*);
         if( isnil(c) ) {
             break;
         }
 
-        if( !curr ) {
-            head = curr = c;
-            continue;
+        if( prev ) {
+            setcdr(prev, cons(u, c, nil));
+            prev = cdr(prev);
+        } else {
+            head = prev = cons(u, c, nil);
         }
-
-        curr->cdr = c;
-        curr = curr->cdr;
     }
 
     va_end(ap);
 
-    return cons(l, LIST, head, nil);
+    return head;
 }
 
-size_t ustring_length(struct ustring *s) {
-    return s ? (s->e > s->s ? s->e - s->s - 1 : 0) : 0;
+
+size_t ustring_length(struct ucell *us) {
+
+    return us ? ((struct ustring*)us->data)->len : 0;
 }
 
-const char *ustring_cstr(struct ustring *us) {
-    return us ? us->s : 0;
+const char *ustring_cstr(struct ucell *us) {
+    return us ? ((struct ustring*)us->data)->data : 0;
 }
-
 
 static uint32_t __pustring_hash(void *a) {
-    struct ustring *k = *(struct ustring**)a;
-    return hash_murmur3_32(k->s, ustring_length(k), 0x00BEEF);
+    struct ucell *k = *(struct ucell**)a;
+    return hash_murmur3_32(ustring_cstr(k), ustring_length(k), 0x00BEEF);
 }
 
 static bool __pustring_eq(void *a, void *b) {
-
-    struct ustring *k1 = *(struct ustring**)a;
-    struct ustring *k2 = *(struct ustring**)b;
+    struct ucell *k1 = *(struct ucell**)a;
+    struct ucell *k2 = *(struct ucell**)b;
 
     size_t k1len = ustring_length(k1);
     size_t k2len = ustring_length(k2);
 
-    return  k1len  == k2len && 0 == memcmp(k1->s, k2->s, k1len);
+    return  k1len  == k2len && 0 == memcmp(ustring_cstr(k1), ustring_cstr(k2), k1len);
 }
 
 void __pustring_cpy(void *a, void *b) {
-    *(struct ustring**)a = *(struct ustring**)b;
+    *(struct ucell**)a = *(struct ucell**)b;
 }
 
-static inline struct ustring *mkustring(struct ulisp *l, struct stringreader *cl) {
+struct ucell *umake_stringlike( struct ulisp *u
+                              , ucell_type tp
+                              , struct stringreader *rd ) {
 
-    static int wtf = 0;
+    size_t size = sizeof(struct ucell)
+                + sizeof(struct ustring)
+                + rd->length(rd->cs)
+                + 1;
 
-    const size_t slen = cl->length(cl->cs) + 1;
-    struct ustring *us = l->alloc(l->allocator, sizeof(struct ustring) + slen);
+    struct ucell *cell = ucell_alloc(u, size);
 
-    if( !us ) {
+    if( !cell ) {
         return 0;
     }
 
-    us->s = &us->data[0];
-    us->e = &us->data[slen];
-    memset(us->data, 0, slen);
+    cell->tp = tp;
+
+    struct ustring *us = (void*)&cell->data[0];
+    us->len = rd->length(rd->cs);
+    memset(us->data, 0, us->len+1);
+
     int chr = 0;
     size_t i = 0;
-    for( ;cl->readchar(cl->cs, &chr); i++ ) {
-        us->s[i] = (char)chr;
+    for( ;rd->readchar(rd->cs, &chr); i++ ) {
+        us->data[i] = (char)chr;
     }
 
-    struct ustring **r = hash_get(l->hstr, &us);
+    struct ucell **r = hash_get(u->hstr, &cell);
 
     if( r ) {
-        l->dealloc(l->allocator, us);
+        u->dealloc(u->allocator, cell);
         return *r;
     }
 
-    if( !hash_add(l->hstr, &us, &us) ) {
-        l->dealloc(l->allocator, us);
+    if( !hash_add(u->hstr, &cell, &cell) ) {
+        u->dealloc(u->allocator, cell);
         return 0;
     }
 
-    return us;
-}
-
-struct ucell* string(struct ulisp *l, struct stringreader *cl) {
-    return cons(l, STRING, mkustring(l, cl), nil);
-}
-
-struct ucell* atom(struct ulisp *l, struct stringreader *cl) {
-    return cons(l, ATOM, mkustring(l, cl), nil);
-}
-
-struct ucell* car( struct ucell *cell ) {
-    return 0;
-}
-
-struct ucell* cdr( struct ucell *cell ) {
-    return 0;
+    return cell;
 }
 
 size_t ulisp_size() {
@@ -245,42 +231,39 @@ static void ucell_walk_rec( struct ulisp *ulisp
                           , struct ucell *parent ) {
 
     if( cell == nil ) {
-        if( parent && parent->tp == LIST ) {
-            cb->on_nil(cb->cc);
-        }
+        cb->on_nil(cb->cc);
         return;
     }
 
     switch( cell->tp ) {
         case INTEGER:
-            safeappv(cb->on_integer, cb->cc, cell->car.integer);
+            safeappv(cb->on_integer, cb->cc, ucell_int(cell));
             break;
 
-        case LIST:
+        case CONS:
             safeappv(cb->on_list_start, cb->cc);
-            ucell_walk_rec(ulisp, cell->car.list, cb, cell);
+            ucell_walk_rec(ulisp, car(cell), cb, cell);
+            ucell_walk_rec(ulisp, cdr(cell), cb, cell);
             safeappv(cb->on_list_end, cb->cc);
             break;
 
         case ATOM:
             safeappv( cb->on_atom
                     , cb->cc
-                    , ustring_length(cell->car.str)
-                    , ustring_cstr(cell->car.str));
+                    , ustring_length(cell)
+                    , ustring_cstr(cell) );
             break;
 
         case STRING:
             safeappv( cb->on_string
                     , cb->cc
-                    , ustring_length(cell->car.str)
-                    , ustring_cstr(cell->car.str));
+                    , ustring_length(cell)
+                    , ustring_cstr(cell) );
             break;
 
         default:
             assert(0);
     }
-
-    ucell_walk_rec(ulisp, cell->cdr, cb, cell);
 }
 
 
@@ -365,19 +348,19 @@ static void token_unget( struct ulisp_parser *p ) {
     p->token.back = p->token.curr;
 }
 
-static inline struct ucell *mk_str_from_strchunk( struct ulisp *u
-                                                , struct strchunk *cs) {
-    return string( u
-                 , mk_strchunk_reader( pstacktmp(struct strchunk_reader)
-                                     , cs ));
-}
+/*static inline struct ucell *mk_str_from_strchunk( struct ulisp *u*/
+/*                                                , struct strchunk *cs) {*/
+/*    return string( u*/
+/*                 , mk_strchunk_reader( pstacktmp(struct strchunk_reader)*/
+/*                                     , cs ));*/
+/*}*/
 
-static inline struct ucell *mk_atom_from_strchunk( struct ulisp *u
-                                                 , struct strchunk *cs) {
-    return atom( u
-                 , mk_strchunk_reader( pstacktmp(struct strchunk_reader)
-                                     , cs ));
-}
+/*static inline struct ucell *mk_atom_from_strchunk( struct ulisp *u*/
+/*                                                 , struct strchunk *cs) {*/
+/*    return atom( u*/
+/*                 , mk_strchunk_reader( pstacktmp(struct strchunk_reader)*/
+/*                                     , cs ));*/
+/*}*/
 
 static void reset_tokenizer( struct ulisp_parser *p, void *reader ) {
 
@@ -395,57 +378,56 @@ static void reset_tokenizer( struct ulisp_parser *p, void *reader ) {
 static struct ucell *parse_expr( struct ulisp_parser *p, struct ucell *top );
 
 static struct ucell *parse_list( struct ulisp_parser *p ) {
+    assert(0);
+/*    struct ulisp *u = p->u;*/
+/*    struct exp_token *tok = token_get(p);*/
 
-    struct ulisp *u = p->u;
-    struct exp_token *tok = token_get(p);
+/*    if( !tok ) {*/
+/*        // FIXME: parse error, unclosed list?*/
+/*        assert(0);*/
+/*        return nil;*/
+/*    }*/
 
-    if( !tok ) {
-        // FIXME: parse error, unclosed list?
-        assert(0);
-        return nil;
-    }
+/*    if( tok->tag == TOK_CPAREN ) {*/
+/*        return nil;*/
+/*    }*/
 
-    if( tok->tag == TOK_CPAREN ) {
-        return nil;
-    }
-
-    token_unget(p);
-    struct ucell *car = parse_expr(p, nil);
-    car->cdr = parse_list(p);
-
-    return car;
+/*    token_unget(p);*/
+/*    struct ucell *car = parse_expr(p, nil);*/
+/*    car->cdr = parse_list(p);*/
+/*    return car;*/
 }
 
 static struct ucell *parse_expr( struct ulisp_parser *p, struct ucell *top ) {
+    assert(0);
+/*    struct exp_token *tok = token_get(p);*/
+/*    struct ulisp *u = p->u;*/
 
-    struct exp_token *tok = token_get(p);
-    struct ulisp *u = p->u;
+/*    switch( tok->tag ) {*/
+/*        case TOK_INTEGER:*/
+/*            return mkinteger(u, tok->v.intval);*/
 
-    switch( tok->tag ) {
-        case TOK_INTEGER:
-            return mkinteger(u, tok->v.intval);
+/*        case TOK_STRING:*/
+/*            return mk_str_from_strchunk(u, tok->v.strval);*/
 
-        case TOK_STRING:
-            return mk_str_from_strchunk(u, tok->v.strval);
+/*        case TOK_ATOM:*/
+/*            return mk_atom_from_strchunk(u, tok->v.atom);*/
 
-        case TOK_ATOM:
-            return mk_atom_from_strchunk(u, tok->v.atom);
+/*        case TOK_OPAREN:*/
+/*            return parse_list(p);*/
 
-        case TOK_OPAREN:
-            return parse_list(p);
+/*        case TOK_CPAREN:*/
+/*            // TODO: error?*/
+/*            assert(0);*/
+/*            return nil;*/
 
-        case TOK_CPAREN:
-            // TODO: error?
-            assert(0);
-            return nil;
+/*        case TOK_ERROR:*/
+/*            // TODO: error?*/
+/*            assert(0);*/
+/*            return nil;*/
+/*    }*/
 
-        case TOK_ERROR:
-            // TODO: error?
-            assert(0);
-            return nil;
-    }
-
-    return nil;
+/*    return nil;*/
 }
 
 struct ucell *ulisp_parse( struct ulisp_parser *p, void *what ) {

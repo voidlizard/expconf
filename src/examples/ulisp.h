@@ -5,7 +5,7 @@
 #include "exp_tokenize.h"
 
 typedef enum {
-     LIST
+     CONS
    , INTEGER
    , ATOM
    , STRING
@@ -39,32 +39,32 @@ struct ucell *ulisp_parse( struct ulisp_parser *p, void *reader );
 
 void ulisp_parser_destroy( struct ulisp_parser *p );
 
-struct ucell* cons( struct ulisp *l
-                  , ucell_type tp
-                  , void *car
-                  , struct ucell *cdr );
+struct ucell *umake(struct ulisp *u, ucell_type tp, size_t n, ...);
 
-struct ucell* list(struct ulisp *l, ...);
-
-struct ucell* string(struct ulisp *l, struct stringreader *sl);
-struct ucell* atom(struct ulisp *l, struct stringreader *sl);
-
-struct ucell* car( struct ucell *cell );
-struct ucell* cdr( struct ucell *cell );
+struct ucell *umake_stringlike( struct ulisp *u
+                              , ucell_type tp
+                              , struct stringreader *rd );
 
 #define nil ((void*)0)
 #define isnil(c) ((c) == nil)
-#define mkinteger(u, iv) cons((u), INTEGER, (void*)iv, nil)
 
-static inline struct ucell* mkcstring(struct ulisp *u, void *cs) {
-    struct cstring_reader csrd;
-    return string(u, mk_cstring_reader(&csrd, cs));
-}
+#define setcar(cell, v) (cell)->data[0] = (v)
+#define setcdr(cell, v) (cell)->data[1] = (v)
+#define car(cell) (cell)->data[0]
+#define cdr(cell) (cell)->data[1]
 
-static inline struct ucell* mkatom(struct ulisp *u, void *cs) {
-    struct cstring_reader csrd;
-    return atom(u, mk_cstring_reader(&csrd, cs));
-}
+#define ucell_int(cell) ((integer)car((cell)))
+
+#define cstring(u, s) \
+umake_stringlike((u), STRING, mk_cstring_reader(pstacktmp(struct cstring_reader), (s)))
+
+#define atom(u, s) \
+umake_stringlike((u), ATOM, mk_cstring_reader(pstacktmp(struct cstring_reader), (s)))
+
+#define integer(u, i) umake((u), INTEGER, 1, (struct ucell*)(i))
+#define cons(u, a, b) umake((u), CONS, 2, (a), (b))
+
+struct ucell *list(struct ulisp *u, ...);
 
 struct ucell_walk_cb {
     void *cc;
