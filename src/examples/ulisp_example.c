@@ -87,9 +87,9 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
 
-    struct ucell *expr = ulisp_parse(p, file);
-    ucell_walk(u, expr, &cb);
-    fprintf(stdout, "\n");
+/*    struct ucell *expr = ulisp_parse(p, file);*/
+/*    ucell_walk(u, expr, &cb);*/
+/*    fprintf(stdout, "\n");*/
 
 __exit:
 
