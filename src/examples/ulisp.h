@@ -27,13 +27,25 @@ void ulisp_destroy( struct ulisp *ulisp );
 struct ulisp_parser;
 size_t ulisp_parser_size();
 
+typedef enum {
+    ERR__UNBALANCED_PAREN
+  , ERR__INVALID_TOKEN
+} ulisp_parser_err;
+
+typedef void (*ulisp_parser_err_fn)(void *cc, ulisp_parser_err err, size_t lno, char *misc);
+
+const char *ulisp_parse_err_str(ulisp_parser_err err);
+
 struct ulisp_parser *ulisp_parser_create( void *mem
                                         , size_t memsize
                                         , read_char_fn readfn
+                                        , void *efn_cc
+                                        , ulisp_parser_err_fn efn
                                         , void *allocator
                                         , alloc_function_t alloc
                                         , dealloc_function_t dealloc
-                                        , struct ulisp *u );
+                                        , struct ulisp *u
+                                        );
 
 struct ucell *ulisp_parse( struct ulisp_parser *p, void *reader );
 

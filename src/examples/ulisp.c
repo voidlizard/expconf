@@ -295,7 +295,15 @@ struct ulisp_parser {
         struct exp_token  *back;
     } token;
 
+    struct {
+        size_t lno;
+        void *cc;
+        bool eof;
+    } rdr;
+
     struct exp_tokenizer *tokenizer;
+    void *on_err_cc;
+    ulisp_parser_err_fn on_err;
 
 };
 
@@ -306,10 +314,13 @@ size_t ulisp_parser_size() {
 struct ulisp_parser *ulisp_parser_create( void *mem
                                         , size_t memsize
                                         , read_char_fn rfn
+                                        , void *efn_cc
+                                        , ulisp_parser_err_fn efn
                                         , void *allocator
                                         , alloc_function_t alloc
                                         , dealloc_function_t dealloc
-                                        , struct ulisp *u ) {
+                                        , struct ulisp *u
+                                        ) {
 
     if( memsize < ulisp_parser_size() ) {
         return 0;
@@ -323,6 +334,9 @@ struct ulisp_parser *ulisp_parser_create( void *mem
                                , .u = u
                                , .token = { 0 }
                                , .tokenizer = 0
+                               , .rdr = { 0 }
+                               , .on_err_cc = efn_cc
+                               , .on_err = efn
                                };
 
     return p;
@@ -354,32 +368,39 @@ static void token_unget( struct ulisp_parser *p ) {
     p->token.back = p->token.curr;
 }
 
-/*static inline struct ucell *mk_str_from_strchunk( struct ulisp *u*/
-/*                                                , struct strchunk *cs) {*/
-/*    return string( u*/
-/*                 , mk_strchunk_reader( pstacktmp(struct strchunk_reader)*/
-/*                                     , cs ));*/
-/*}*/
+static bool __lno_reader_wrapper( void *cc, unsigned char *c ) {
+    struct ulisp_parser *p = cc;
+    unsigned char nc = 0;
+    bool ok = p->readfn(p->rdr.cc, &nc);
 
-/*static inline struct ucell *mk_atom_from_strchunk( struct ulisp *u*/
-/*                                                 , struct strchunk *cs) {*/
-/*    return atom( u*/
-/*                 , mk_strchunk_reader( pstacktmp(struct strchunk_reader)*/
-/*                                     , cs ));*/
-/*}*/
+    if( !ok ) {
+        p->rdr.eof = true;
+        return false;
+    }
+
+    *c = nc;
+
+    if( nc == '\n' ) {
+        p->rdr.lno++;
+    }
+
+    return ok;
+}
 
 static void reset_tokenizer( struct ulisp_parser *p, void *reader ) {
 
     destroy_tokenizer(p);
 
+    p->rdr.lno = 1;
+    p->rdr.cc = reader;
+
     p->tokenizer = exp_tokenizer_create( p->allocator
                                        , p->alloc
                                        , p->dealloc
-                                       , reader
-                                       , p->readfn );
+                                       , p
+                                       , __lno_reader_wrapper );
 
 }
-
 
 static struct ucell *parse_expr( struct ulisp_parser *p, struct ucell *top );
 
@@ -388,8 +409,7 @@ static struct ucell *parse_list( struct ulisp_parser *p ) {
     struct exp_token *tok = token_get(p);
 
     if( !tok ) {
-        // FIXME: parse error, unclosed list?
-        assert(0);
+        p->on_err(p->on_err_cc, ERR__UNBALANCED_PAREN, p->rdr.lno, "");
         return nil;
     }
 
@@ -421,13 +441,11 @@ static struct ucell *parse_expr( struct ulisp_parser *p, struct ucell *top ) {
             return parse_list(p);
 
         case TOK_CPAREN:
-            // TODO: error?
-            assert(0);
+            p->on_err(p->on_err_cc, ERR__UNBALANCED_PAREN, p->rdr.lno, "");
             return nil;
 
         case TOK_ERROR:
-            // TODO: error?
-            assert(0);
+            p->on_err(p->on_err_cc, ERR__INVALID_TOKEN, p->rdr.lno, "");
             return nil;
     }
 
@@ -443,4 +461,13 @@ struct ucell *ulisp_parse( struct ulisp_parser *p, void *what ) {
     return parse_expr(p, list(p->u, nil));
 }
 
-
+const char *ulisp_parse_err_str(ulisp_parser_err err) {
+    switch(err) {
+        case ERR__UNBALANCED_PAREN:
+            return "unbalanced parens";
+        case ERR__INVALID_TOKEN:
+            return "invalid token format (string, number, atom?)";
+        default:
+            return "unknown parse error";
+    }
+}

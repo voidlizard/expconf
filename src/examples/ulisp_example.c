@@ -29,6 +29,15 @@ void print_list_end( void *cc ) {
     fprintf(stdout, ") ");
 }
 
+static void show_parse_error( void *cc
+                            , ulisp_parser_err err
+                            , size_t lno
+                            , char *misc) {
+
+    fprintf(stderr, "*** error (parse) %ld: %s\n", lno, ulisp_parse_err_str(err));
+}
+
+
 int main(int argc, char *argv[]) {
 
     if( argc < 2 ) {
@@ -74,6 +83,8 @@ int main(int argc, char *argv[]) {
     struct ulisp_parser *p = ulisp_parser_create( pmem
                                                 , sizeof(pmem)
                                                 , file_read_char
+                                                , 0
+                                                , show_parse_error
                                                 , 0
                                                 , example_alloc
                                                 , example_dealloc
