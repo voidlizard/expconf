@@ -1,24 +1,9 @@
 #ifndef __ulisp_h
 #define __ulisp_h
 
-#include "ulisp_platform.h"
+#include "ulisp_types.h"
 #include "ulisp_bind.h"
 #include "exp_tokenize.h"
-
-typedef enum {
-     CONS
-   , INTEGER
-   , ATOM
-   , STRING
-   , TUPLE
-} ucell_type;
-
-struct ulisp;
-struct ucell;
-struct utuple;
-
-typedef struct ucell ucell_t;
-typedef struct utuple utuple_t;
 
 size_t ulisp_size();
 
