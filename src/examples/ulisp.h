@@ -46,7 +46,7 @@ struct ucell *ulisp_parse_top( struct ulisp_parser *p, void *what );
 void ulisp_parser_destroy( struct ulisp_parser *p );
 
 void ulisp_eval_top( struct ulisp *u, struct ucell *top );
-
+ucell_t *ulisp_eval_expr( struct ulisp *u, ucell_t *expr );
 
 struct ucell *umake(struct ulisp *u, ucell_type tp, size_t n, ...);
 
@@ -74,6 +74,8 @@ umake_stringlike((u), ATOM, mk_cstring_reader(pstacktmp(struct cstring_reader), 
 #define cons(u, a, b) umake((u), CONS, 2, (a), (b))
 
 #define bind(u,n,what) tuple((u), 2, atom((u), (n)), (what))
+
+#define primop(u, op) umake((u), PRIMOP, 1, (op))
 
 struct ucell *list(struct ulisp *u, ...);
 struct ucell *tuple(struct ulisp *u, size_t size, ...);

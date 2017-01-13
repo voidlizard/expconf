@@ -4,7 +4,8 @@
 #include "ulisp_platform.h"
 
 typedef enum {
-     CONS
+     UNIT
+   , CONS
    , INTEGER
    , ATOM
    , STRING

@@ -3,8 +3,7 @@
 
 #include "ulisp_types.h"
 
-struct ulisp_bind {
-    char *name;
+struct ulisp_primop {
     uint8_t arity;
     void *callee_cc;
     void *callee;

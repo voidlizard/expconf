@@ -47,6 +47,18 @@ static struct ucell_walk_cb walk_cb = { .cc = 0
                                       , .on_nil        = print_nil
                                       };
 
+static ucell_t *__display( struct ulisp *u, ucell_t *rs ) {
+    fprintf(stdout, "IT'S DISPLAY, motherfucker!\n");
+    return nil;
+}
+
+static struct ulisp_primop  __primop_display = { .arity = 1
+                                               , .callee_cc = 0
+                                               , .callee = 0
+                                               , .wrapper = __display
+                                               , .tp = UNIT
+                                               , .argtp = { STRING }
+                                               };
 
 int main(int argc, char *argv[]) {
 
@@ -69,7 +81,7 @@ int main(int argc, char *argv[]) {
 
     assert( u );
 
-    struct ucell *binds = list(u, bind(u, "i42", integer(u, 42))
+    struct ucell *binds = list(u, bind(u, "display", primop(u, &__primop_display))
                                 , nil
                               );
 

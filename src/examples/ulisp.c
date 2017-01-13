@@ -42,11 +42,24 @@ struct utuple {
 };
 
 struct udict_key {
-    struct ustring us;
-    char mem[ULISP_ATOM_MAX+1];
+    struct ucell *p;
 };
 
 #define utuple_val(e) (((e)->tp == TUPLE) ? ((utuple_t*)(e)->data) : nil)
+
+static inline size_t arity(struct ucell *expr) {
+    if( isnil(expr) )
+        return 0;
+
+    switch( expr->tp ) {
+        case PRIMOP:
+            return 666;
+
+        default:
+            return 0;
+    }
+
+}
 
 static struct ucell *ucell_alloc(struct ulisp *u, size_t bytes) {
 
@@ -75,6 +88,8 @@ static struct ucell *umake_nil(struct ulisp *u, ucell_type tp, size_t n) {
 struct ucell *umake(struct ulisp *u, ucell_type tp, size_t n, ...) {
 
     struct ucell *cell = umake_nil(u, tp, n);
+
+    fprintf(stderr, "umake %u (%ld) %p\n",  tp, n, cell);
 
     if( !cell )
         return nil;
@@ -118,6 +133,14 @@ struct ucell *list(struct ulisp *u, ...) {
     va_end(ap);
 
     return head;
+}
+
+static inline size_t utuple_len(struct ulisp *u, struct ucell *t) {
+    struct utuple *tpl = utuple_val(t);
+    if( !tpl ) {
+        return 0;
+    }
+    return tpl->len;
 }
 
 static inline void utuple_set(struct ulisp *u, struct ucell *t, size_t i, ucell_t *v) {
@@ -166,7 +189,7 @@ static ucell_t *tuple_alloc(struct ulisp *u, size_t n) {
     return tpl;
 }
 
-static ucell_t *tuplecons(struct ulisp *u, ucell_t *e) {
+static ucell_t *tuplecons(struct ulisp *u, ucell_t *e, bool eval) {
 
     integer l = __list_length(e);
 
@@ -176,7 +199,7 @@ static ucell_t *tuplecons(struct ulisp *u, ucell_t *e) {
     ucell_t *ee = e;
 
     for(; !isnil(ee); ee = cdr(ee), i++ ) {
-        utuple_set(u, tpl, i, car(ee));
+        utuple_set(u, tpl, i, eval ? ulisp_eval_expr(u, car(ee)) : car(ee));
     }
 
     return tpl;
@@ -243,18 +266,17 @@ void __pustring_cpy(void *a, void *b) {
 
 static uint32_t __udict_key_hash(void *k_) {
     struct udict_key *k = k_;
-    struct ustring *us = &k->us;
-    return hash_murmur3_32(us->data, us->len, 3576681);
+    return (uint32_t)(size_t)k->p;
 }
 
 static bool __udict_key_cmp(void *a, void *b) {
     struct udict_key *k1 = a;
     struct udict_key *k2 = b;
-    return    k1->us.len == k2->us.len
-           && 0 == memcmp(k1->us.data, k2->us.data, k1->us.len);
+    return k1->p == k2->p;
 }
 
 static void __udict_key_cpy(void *a, void *b) {
+    struct udict_key *k = b;
     memcpy(a, b, sizeof(struct udict_key));
 }
 
@@ -268,9 +290,7 @@ static struct udict_key *udict_key_init( struct udict_key *mem, ucell_t *expr ) 
     if( !s )
         return 0;
 
-    memset(mem, 0, sizeof(struct udict_key));
-    mem->us.len = ustring_length(expr);
-    memcpy(mem->us.data, s, mem->us.len);
+    mem->p = expr;
     return mem;
 }
 
@@ -449,7 +469,7 @@ void ucell_walk( struct ulisp *ulisp
 }
 
 static void __dict_alter_value( void *cc, void *k, void *v, bool n ) {
-    __udict_val_cpy(k, cc);
+    __udict_val_cpy(v, cc);
 }
 
 static void ulisp_bind_one(struct ulisp *u, ucell_t *bind) {
@@ -462,9 +482,15 @@ static void ulisp_bind_one(struct ulisp *u, ucell_t *bind) {
         assert(0);
     }
 
-    struct udict_key ktmp = { 1 };
+    struct udict_key ktmp = { 0 };
     struct udict_key *k = udict_key_init(&ktmp, utuple_get(u, bind, 0));
     ucell_t *value = utuple_get(u, bind, 1);
+
+    fprintf(stderr, "bind obj %p (%u)\n", value, value->tp);
+
+    fprintf(stderr, "got string (%s) %p\n"
+                  , ustring_cstr(utuple_get(u, bind, 0))
+                  , utuple_get(u, bind, 0));
 
     if( !k ) {
         // FIXME: error notification
@@ -717,55 +743,39 @@ struct ucell *ulisp_parse_top( struct ulisp_parser *p, void *what ) {
     return head;
 }
 
+ucell_t *apply_tuple( struct ulisp *u, ucell_t *tuple ) {
 
-static ucell_t *eval_apply( struct ulisp *u, ucell_t *what, ucell_t *to ) {
+    ucell_t *expr = utuple_get(u, tuple, 0);
 
-    // TODO: check callee
-    // what ?
+    fprintf(stderr, "eval_tuple %p\n", expr);
 
-    // TODO: lookup
-
-    // TODO: make tuple
-    ucell_t *args = tuplecons(u, to);
-
-    // TODO: check arity
-    // TODO: check types
-    // TODO: eval args
-    // TODO: call
-    // TODO: wrap result
-    // TODO: return result
-
-    return nil;
-}
-
-
-static ucell_t *eval_cons( struct ulisp *u, ucell_t *expr ) {
-
-    ucell_t *c = car(expr);
-
-    if( isnil(c) ) {
+    if( isnil(expr) ) {
+        // FIXME: error
+        fprintf(stderr, "*** error (runtime): can't apply nil\n");
         return nil;
     }
 
-    switch(c->tp) {
-        case ATOM:
-            fprintf(stderr, "got atom %s\n", ustring_cstr(c));
-            return eval_apply(u, car(expr), cdr(expr));
+    fprintf(stderr, "got smth %u\n", expr->tp);
 
-        case CONS:
-            // FIXME: error notification
-            fprintf(stderr, "got cons, unsupported yet\n");
-            return nil;
-
-        default:
-            // FIXME: bad application
-            // FIXME: error notification
-            fprintf(stderr, "got literal, bad application\n");
-            return nil;
-
+    size_t ar = utuple_len(u, tuple)-1;
+    if( ar != arity(expr) ) {
+        // FIXME: error
+        fprintf(stderr, "*** error (runtime): arity mismatch %ld ~ %ld\n", ar, arity(expr));
+        return nil;
     }
 
-    return nil;
+    if( expr->tp == PRIMOP ) {
+        fprintf(stderr, "CALL PRIMOP \n");
+        return nil;
+    }
+
+    return expr;
+}
+
+static void __debug_dump_dict(void *cc, void *k_, void *v_) {
+    struct udict_key *k = k_;
+    struct ucell *v = v_;
+    fprintf(stderr, "dict entry %p %p\n", k->p, v);
 }
 
 ucell_t *ulisp_eval_expr( struct ulisp *u, ucell_t *expr ) {
@@ -774,9 +784,15 @@ ucell_t *ulisp_eval_expr( struct ulisp *u, ucell_t *expr ) {
         return nil;
 
     switch( expr->tp ) {
-        case ATOM:
-            // lookup in dictionary
-            return expr;
+        case ATOM: {
+            void *e = hash_get(u->dict, udict_key_init(pstacktmp(struct udict_key), expr));
+            if( isnil(e) ) {
+                // FIXME: error handling
+                fprintf(stderr, "*** error (runtime): unbound symbol %s\n", ustring_cstr(expr));
+                return nil;
+            }
+            return e;
+        }
 
         case INTEGER:
             return expr;
@@ -785,7 +801,7 @@ ucell_t *ulisp_eval_expr( struct ulisp *u, ucell_t *expr ) {
             return expr;
 
         case CONS:
-            return eval_cons(u, expr);
+            return apply_tuple(u, tuplecons(u, expr, true));
 
         default:
             assert(0);
