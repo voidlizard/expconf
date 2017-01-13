@@ -9,10 +9,15 @@ typedef enum {
    , INTEGER
    , ATOM
    , STRING
+   , TUPLE
 } ucell_type;
 
 struct ulisp;
 struct ucell;
+struct utuple;
+
+typedef struct ucell ucell_t;
+typedef struct utuple utuple_t;
 
 size_t ulisp_size();
 
@@ -51,6 +56,9 @@ struct ucell *ulisp_parse( struct ulisp_parser *p, void *reader );
 struct ucell *ulisp_parse_top( struct ulisp_parser *p, void *what );
 
 void ulisp_parser_destroy( struct ulisp_parser *p );
+
+void ulisp_eval_top( struct ulisp *u, struct ucell *top );
+
 
 struct ucell *umake(struct ulisp *u, ucell_type tp, size_t n, ...);
 

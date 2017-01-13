@@ -98,9 +98,12 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
 
-    struct ucell *expr = ulisp_parse_top(p, file);
-    ucell_walk(u, expr, &cb);
+    struct ucell *top = ulisp_parse_top(p, file);
+
+    ucell_walk(u, top, &cb);
     fprintf(stdout, "\n");
+
+    ulisp_eval_top(u, top);
 
 __exit:
 

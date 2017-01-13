@@ -33,8 +33,12 @@ struct ustring {
     char data[0];
 };
 
-#define nil ((void*)0)
+struct utuple {
+    integer len;
+    ucell_t *t[0];
+};
 
+#define utuple_val(e) (((e)->tp == TUPLE) ? ((utuple_t*)(e)->data) : nil)
 
 static struct ucell *ucell_alloc(struct ulisp *u, size_t bytes) {
 
@@ -44,18 +48,28 @@ static struct ucell *ucell_alloc(struct ulisp *u, size_t bytes) {
     return u->alloc(u->allocator, bytes);
 }
 
-struct ucell *umake(struct ulisp *u, ucell_type tp, size_t n, ...) {
+static struct ucell *umake_nil(struct ulisp *u, ucell_type tp, size_t n) {
 
     if( n < 1 )
-        return 0;
+        return nil;
 
     const size_t ms = sizeof(struct ucell) + (n-1)*sizeof(struct ucell*);
     struct ucell *cell = ucell_alloc(u, ms);
 
     if( !cell )
-        return 0;
+        return nil;
 
     cell->tp = tp;
+
+    return cell;
+}
+
+struct ucell *umake(struct ulisp *u, ucell_type tp, size_t n, ...) {
+
+    struct ucell *cell = umake_nil(u, tp, n);
+
+    if( !cell )
+        return nil;
 
     va_list ap;
     va_start(ap, n);
@@ -98,6 +112,41 @@ struct ucell *list(struct ulisp *u, ...) {
     return head;
 }
 
+static inline void utuple_set(struct ulisp *u, struct utuple *t, integer i, ucell_t *v) {
+    // FIXME: bounds check
+    t->t[i] = v;
+}
+
+static integer __list_length(ucell_t *e) {
+    integer l = 0;
+    for(; !isnil(e); e = cdr(e) ) l++;
+    return l;
+}
+
+static ucell_t *tuplecons(struct ulisp *u, ucell_t *e) {
+
+    integer l = __list_length(e);
+
+    ucell_t *tpl = umake_nil(u, TUPLE, l+1);
+
+    if( !tpl ) {
+        // FIXME: ERROR: out of memory
+        return nil;
+    }
+
+    struct utuple *ttpl = utuple_val(tpl);
+
+    ttpl->len = l;
+
+    integer i = 0;
+    ucell_t *ee = e;
+
+    for(; !isnil(ee); ee = cdr(ee), i++ ) {
+        utuple_set(u, ttpl, i, car(ee));
+    }
+
+    return tpl;
+}
 
 size_t ustring_length(struct ucell *us) {
 
@@ -513,6 +562,101 @@ struct ucell *ulisp_parse_top( struct ulisp_parser *p, void *what ) {
 }
 
 
+static ucell_t *eval_apply( struct ulisp *u, ucell_t *what, ucell_t *to ) {
+
+    // TODO: check callee
+    // what ?
+
+
+    // TODO: lookup
+
+    // TODO: make tuple
+    ucell_t *args = tuplecons(u, to);
+
+    // TODO: check arity
+    // TODO: check types
+    // TODO: eval args
+    // TODO: call
+    // TODO: wrap result
+    // TODO: return result
+
+    return nil;
+}
+
+
+static ucell_t *eval_cons( struct ulisp *u, ucell_t *expr ) {
+
+    ucell_t *c = car(expr);
+
+    if( isnil(c) ) {
+        return nil;
+    }
+
+    switch(c->tp) {
+        case ATOM:
+            fprintf(stderr, "got atom %s\n", ustring_cstr(c));
+            return eval_apply(u, car(expr), cdr(expr));
+
+        case CONS:
+            // FIXME: error notification
+            fprintf(stderr, "got cons, unsupported yet\n");
+            return nil;
+
+        default:
+            // FIXME: bad application
+            // FIXME: error notification
+            fprintf(stderr, "got literal, bad application\n");
+            return nil;
+
+    }
+
+    return nil;
+}
+
+ucell_t *ulisp_eval_expr( struct ulisp *u, ucell_t *expr ) {
+
+    if( isnil(expr) )
+        return nil;
+
+    switch( expr->tp ) {
+        case ATOM:
+            // lookup in dictionary
+            return expr;
+
+        case INTEGER:
+            return expr;
+
+        case STRING:
+            return expr;
+
+        case CONS:
+            return eval_cons(u, expr);
+
+        default:
+            assert(0);
+    }
+
+    return nil;
+}
+
+void ulisp_eval_top( struct ulisp *u, struct ucell *top ) {
+
+    ucell_t *expr = top;
+
+    for( ; expr; expr = cdr(expr) ) {
+
+        if( isnil(car(expr)) || car(expr)->tp != CONS ) {
+            // FIXME: normal error notification
+            // FIXME: stop on error?
+            // FIXME: line number (???)
+            fprintf(stderr, "*** error (eval): invalid top-level construct as line ()\n");
+            continue;
+        }
+
+        (void)ulisp_eval_expr(u, car(expr));
+    }
+}
+
 const char *ulisp_parse_err_str(ulisp_parser_err err) {
     switch(err) {
         case ERR__UNBALANCED_PAREN:
@@ -523,3 +667,4 @@ const char *ulisp_parse_err_str(ulisp_parser_err err) {
             return "unknown parse error";
     }
 }
+
