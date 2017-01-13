@@ -15,7 +15,10 @@ umake_stringlike((u), ATOM, mk_strchunk_reader(pstacktmp(struct strchunk_reader)
 
 struct ulisp {
 
+    // FIXME: remove obsolete
     struct hash *hstr;
+
+    struct hash *dict;
 
     // allocator boilerplate
     void *allocator;
@@ -36,6 +39,11 @@ struct ustring {
 struct utuple {
     integer len;
     ucell_t *t[0];
+};
+
+struct udict_key {
+    struct ustring us;
+    char mem[ULISP_ATOM_MAX+1];
 };
 
 #define utuple_val(e) (((e)->tp == TUPLE) ? ((utuple_t*)(e)->data) : nil)
@@ -113,8 +121,29 @@ struct ucell *list(struct ulisp *u, ...) {
 }
 
 static inline void utuple_set(struct ulisp *u, struct ucell *t, size_t i, ucell_t *v) {
-    // FIXME: bounds check
-/*    t->t[i] = v;*/
+    struct utuple *tpl = utuple_val(t);
+
+    if( !tpl ) {
+        // FIXME: error?
+        assert(0);
+        return;
+    }
+
+    if( i < tpl->len ) {
+        tpl->t[i] = v;
+    } else {
+        // FIXME: error?
+        assert(0);
+    }
+}
+
+static inline ucell_t *utuple_get(struct ulisp *u, struct ucell *t, size_t i) {
+    struct utuple *tpl = utuple_val(t);
+    if( !tpl ) {
+        // FIXME: error?
+        return nil;
+    }
+    return i < tpl->len ? tpl->t[i] : nil;
 }
 
 static integer __list_length(ucell_t *e) {
@@ -171,11 +200,25 @@ struct ucell *tuple(struct ulisp *u, size_t size, ...) {
 
 size_t ustring_length(struct ucell *us) {
 
-    return us ? ((struct ustring*)us->data)->len : 0;
+    if( isnil(us) )
+        return 0;
+
+    if( us->tp == STRING || us->tp == ATOM ) {
+        return ((struct ustring*)us->data)->len;
+    }
+
+    return 0;
 }
 
 const char *ustring_cstr(struct ucell *us) {
-    return us ? ((struct ustring*)us->data)->data : 0;
+
+    if( isnil(us) )
+        return 0;
+
+    if( us->tp == STRING || us->tp == ATOM ) {
+        return ((struct ustring*)us->data)->data;
+    }
+    return 0;
 }
 
 static uint32_t __pustring_hash(void *a) {
@@ -193,9 +236,44 @@ static bool __pustring_eq(void *a, void *b) {
     return  k1len  == k2len && 0 == memcmp(ustring_cstr(k1), ustring_cstr(k2), k1len);
 }
 
+
 void __pustring_cpy(void *a, void *b) {
     *(struct ucell**)a = *(struct ucell**)b;
 }
+
+static uint32_t __udict_key_hash(void *k_) {
+    struct udict_key *k = k_;
+    struct ustring *us = &k->us;
+    return hash_murmur3_32(us->data, us->len, 3576681);
+}
+
+static bool __udict_key_cmp(void *a, void *b) {
+    struct udict_key *k1 = a;
+    struct udict_key *k2 = b;
+    return    k1->us.len == k2->us.len
+           && 0 == memcmp(k1->us.data, k2->us.data, k1->us.len);
+}
+
+static void __udict_key_cpy(void *a, void *b) {
+    memcpy(a, b, sizeof(struct udict_key));
+}
+
+static void __udict_val_cpy(void *a, void *b) {
+    *(struct ucell**)a = *(struct ucell**)b;
+}
+
+static struct udict_key *udict_key_init( struct udict_key *mem, ucell_t *expr ) {
+    const char *s = ustring_cstr(expr);
+
+    if( !s )
+        return 0;
+
+    memset(mem, 0, sizeof(struct udict_key));
+    mem->us.len = ustring_length(expr);
+    memcpy(mem->us.data, s, mem->us.len);
+    return mem;
+}
+
 
 struct ucell *umake_stringlike( struct ulisp *u
                               , ucell_type tp
@@ -286,12 +364,40 @@ struct ulisp *ulisp_create( void *mem
                          , l->alloc
                          , l->dealloc );
 
+
+    const size_t dsz = hash_minimal_mem_size( BKT
+                                            , MINITEMS
+                                            , sizeof(struct udict_key)
+                                            , sizeof(struct ucell*) );
+
+
+    void *dmem = l->alloc(l->allocator, dsz);
+
+    if( !dmem ) {
+        return 0;
+    }
+
+    l->dict = hash_create( dsz
+                         , dmem
+                         , sizeof(struct udict_key)
+                         , sizeof(struct ucell*)
+                         , BKT
+                         , __udict_key_hash
+                         , __udict_key_cmp
+                         , __udict_key_cpy
+                         , __udict_val_cpy
+                         , l->allocator
+                         , l->alloc
+                         , l->dealloc );
+
     return l;
 }
 
 void ulisp_destroy( struct ulisp *l ) {
     hash_destroy(l->hstr);
     l->dealloc(l->allocator, l->hstr);
+    hash_destroy(l->dict);
+    l->dealloc(l->allocator, l->dict);
 }
 
 static void ucell_walk_rec( struct ulisp *ulisp
@@ -342,8 +448,35 @@ void ucell_walk( struct ulisp *ulisp
     ucell_walk_rec(ulisp, cell, cb, 0);
 }
 
+static void __dict_alter_value( void *cc, void *k, void *v, bool n ) {
+    __udict_val_cpy(k, cc);
+}
+
 static void ulisp_bind_one(struct ulisp *u, ucell_t *bind) {
-    fprintf(stderr, "ulisp_bind_one\n");
+
+    struct utuple *tpl = utuple_val(bind);
+
+    if( !tpl ) {
+        // FIXME: error notification
+        fprintf(stderr, "*** error (init): bind must be a tuple\n");
+        assert(0);
+    }
+
+    struct udict_key ktmp = { 1 };
+    struct udict_key *k = udict_key_init(&ktmp, utuple_get(u, bind, 0));
+    ucell_t *value = utuple_get(u, bind, 1);
+
+    if( !k ) {
+        // FIXME: error notification
+        fprintf(stderr, "*** error (init): bind key must be a string\n");
+        assert(0);
+    }
+
+    if( !value ) {
+        return;
+    }
+
+    hash_alter(u->dict, true, k, &value, __dict_alter_value);
 }
 
 void ulisp_bind(struct ulisp *u, ucell_t *bindlist) {

@@ -70,7 +70,6 @@ int main(int argc, char *argv[]) {
     assert( u );
 
     struct ucell *binds = list(u, bind(u, "i42", integer(u, 42))
-                                , bind(u, "i43", integer(u, 43))
                                 , nil
                               );
 
