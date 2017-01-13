@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# **************************************************************************
+# *                                                                        *
+# *    (C) Copyright Paul Mensonides 2003-2005.                            *
+# *                                                                        *
+# *    Distributed under the Boost Software License, Version 1.0.          *
+# *    (See accompanying file LICENSE).                                    *
+# *                                                                        *
+# *    See http://chaos-pp.sourceforge.net for the most recent version.    *
+# *                                                                        *
+# **************************************************************************
+
+# $1 == library specification file
+# $2 == source path
+# $3 == destination path
+# $4 == regular expression
+
+# example: ./build ../documentation{/library.xml,} ../built-docs ".*"
+
+clear
+
+echo expanding library...
+xsltproc -o .library.xml --stringparam source "$2" library.xsl "$1"
+
+echo generating symbol table...
+xsltproc -o .symbol.xsl symbol.xsl .library.xml
+
+echo copying support files...
+mkdir -p "$3"
+cp style.css "$3"/style.css
+cp alternate.css "$3"/alternate.css
+cp background.gif "$3"/background.gif
+
+echo creating indices...
+xsltproc -o "$3"/documents.html --stringparam mode documents --stringparam source "$2" index.xsl .library.xml
+xsltproc -o "$3"/headers.html --stringparam mode headers --stringparam source "$2" index.xsl .library.xml
+xsltproc -o "$3"/primary.html --stringparam mode primaries --stringparam source "$2" index.xsl .library.xml
+xsltproc -o "$3"/secondary.html --stringparam mode secondaries --stringparam source "$2" index.xsl .library.xml
+
+echo generating meta-transformations...
+xsltproc -o .meta.xsl --stringparam source "$2" meta.xsl "$1"
+
+echo generating script...
+xsltproc -o .script script.xsl "$1"
+chmod +rx .script
+
+echo executing script...
+echo "" > .temp.xml
+./.script $@ ".*"
+
+echo deleting temporary files...
+rm .library.xml .meta.xsl .script .symbol.xsl .temp.xml
