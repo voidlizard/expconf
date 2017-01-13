@@ -378,7 +378,6 @@ static bool __lno_reader_wrapper( void *cc, unsigned char *c ) {
     bool ok = p->readfn(p->rdr.cc, &nc);
 
     if( !ok ) {
-        fprintf(stderr, "here: set eof\n");
         p->rdr.eof = true;
         return false;
     }
@@ -426,34 +425,52 @@ static struct ucell *parse_list( struct ulisp_parser *p ) {
 }
 
 static struct ucell *parse_expr( struct ulisp_parser *p, struct ucell *top ) {
-    struct exp_token *tok = token_get(p);
-    struct ulisp *u = p->u;
 
-    if( !tok ) {
-        return nil;
-    }
+    do {
 
-    switch( tok->tag ) {
-        case TOK_INTEGER:
-            return integer(u, tok->v.intval);
+        struct exp_token *tok = token_get(p);
+        struct ulisp *u = p->u;
 
-        case TOK_STRING:
-            return cstring_tok(u, tok->v.strval);
-
-        case TOK_ATOM:
-            return atom_tok(u, tok->v.atom);
-
-        case TOK_OPAREN:
-            return parse_list(p);
-
-        case TOK_CPAREN:
-            p->on_err(p->on_err_cc, ERR__UNBALANCED_PAREN, p->rdr.lno, "");
+        if( !tok ) {
             return nil;
+        }
 
-        case TOK_ERROR:
-            p->on_err(p->on_err_cc, ERR__INVALID_TOKEN, p->rdr.lno, "");
-            return nil;
-    }
+        switch( tok->tag ) {
+
+            case TOK_NEWLINE:
+                continue;
+
+            case TOK_INTEGER:
+                return integer(u, tok->v.intval);
+
+            case TOK_STRING:
+                return cstring_tok(u, tok->v.strval);
+
+            case TOK_ATOM:
+                return atom_tok(u, tok->v.atom);
+
+            case TOK_OPAREN:
+                return parse_list(p);
+
+            case TOK_CPAREN:
+                p->on_err(p->on_err_cc, ERR__UNBALANCED_PAREN, p->rdr.lno, "");
+                return nil;
+
+            case TOK_ERROR:
+                p->on_err(p->on_err_cc, ERR__INVALID_TOKEN, p->rdr.lno, "");
+                return nil;
+
+            case TOK_COMMA:
+                return atom(u, ",");
+
+            case TOK_SEMI:
+                return atom(u, ";");
+
+            default:
+                assert(0);
+        }
+
+    } while(1);
 
     return nil;
 }

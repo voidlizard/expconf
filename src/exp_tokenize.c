@@ -127,8 +127,12 @@ static bool is_space(void *c, unsigned char chr) {
     return !!strchr(" \t\r\n\v\f", (int)chr);
 }
 
+static bool is_space_but_newline(void *c, unsigned char chr) {
+    return !!strchr(" \t\r\v\f", (int)chr);
+}
+
 static bool is_punct(void *c, unsigned char chr) {
-    return !!strchr(".()", (int)chr);
+    return !!strchr(".();,", (int)chr);
 }
 
 static bool is_line_comment(void *c, unsigned char chr) {
@@ -230,6 +234,8 @@ static inline void takeuntil( struct exp_tokenizer *t
 }
 
 #define skip_space(t) takewhile((t), 0, is_space, 0, ignore)
+#define skip_space_but_newline(t) takewhile((t), 0, is_space_but_newline, 0, ignore)
+#define skip_hspace(t) takewhile((t), 0, is_hspace, 0, ignore)
 #define skip_until(t, pcc, pred) takeuntil((t), (pcc), (pred), 0, ignore)
 #define skip_char(t) (void)(__readchar(t))
 
@@ -246,6 +252,9 @@ static void emit_token( struct exp_tokenizer *t
         case TOK_ERROR:
         case TOK_OPAREN:
         case TOK_CPAREN:
+        case TOK_COMMA:
+        case TOK_SEMI:
+        case TOK_NEWLINE:
             break;
 
         case TOK_ATOM:
@@ -409,12 +418,17 @@ struct exp_token * exp_tokenizer_next( struct exp_tokenizer *t
     }
 
     do {
-        skip_space(t);
+        skip_space_but_newline(t);
 
         unsigned char *pc = __readchar(t);
 
         if( !pc )
             return 0;
+
+        if( *pc == '\n' ) {
+            emit_token(t, TOK_NEWLINE, 0, tok);
+            return tok;
+        }
 
         if( is_line_comment(t, *pc) ) {
             skip_until(t, 0, is_newline);
@@ -432,6 +446,15 @@ struct exp_token * exp_tokenizer_next( struct exp_tokenizer *t
             return tok;
         }
 
+        if( *pc == ',' ) {
+            emit_token(t, TOK_COMMA, 0, tok);
+            return tok;
+        }
+
+        if( *pc == ';' ) {
+            emit_token(t, TOK_SEMI, 0, tok);
+            return tok;
+        }
 
         if( is_dec_digit(0, *pc) ) {
 
@@ -514,6 +537,12 @@ const char *exp_token_tag_name(exp_token_tag tag) {
     switch(tag) {
         case TOK_ERROR:
             return "ERROR";
+        case TOK_COMMA:
+            return "TOK_COMMA";
+        case TOK_SEMI:
+            return "TOK_SEMI";
+        case TOK_NEWLINE:
+            return "TOK_NEWLINE";
         case TOK_OPAREN:
             return "OPAREN";
         case TOK_CPAREN:
