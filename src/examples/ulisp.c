@@ -567,7 +567,6 @@ static ucell_t *eval_apply( struct ulisp *u, ucell_t *what, ucell_t *to ) {
     // TODO: check callee
     // what ?
 
-
     // TODO: lookup
 
     // TODO: make tuple

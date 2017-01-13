@@ -2,6 +2,7 @@
 #define __ulisp_h
 
 #include "ulisp_platform.h"
+#include "ulisp_bind.h"
 #include "exp_tokenize.h"
 
 typedef enum {
