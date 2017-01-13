@@ -112,9 +112,9 @@ struct ucell *list(struct ulisp *u, ...) {
     return head;
 }
 
-static inline void utuple_set(struct ulisp *u, struct utuple *t, integer i, ucell_t *v) {
+static inline void utuple_set(struct ulisp *u, struct ucell *t, size_t i, ucell_t *v) {
     // FIXME: bounds check
-    t->t[i] = v;
+/*    t->t[i] = v;*/
 }
 
 static integer __list_length(ucell_t *e) {
@@ -123,11 +123,8 @@ static integer __list_length(ucell_t *e) {
     return l;
 }
 
-static ucell_t *tuplecons(struct ulisp *u, ucell_t *e) {
-
-    integer l = __list_length(e);
-
-    ucell_t *tpl = umake_nil(u, TUPLE, l+1);
+static ucell_t *tuple_alloc(struct ulisp *u, size_t n) {
+    ucell_t *tpl = umake_nil(u, TUPLE, n+1);
 
     if( !tpl ) {
         // FIXME: ERROR: out of memory
@@ -136,14 +133,38 @@ static ucell_t *tuplecons(struct ulisp *u, ucell_t *e) {
 
     struct utuple *ttpl = utuple_val(tpl);
 
-    ttpl->len = l;
+    ttpl->len = n;
+    return tpl;
+}
+
+static ucell_t *tuplecons(struct ulisp *u, ucell_t *e) {
+
+    integer l = __list_length(e);
+
+    ucell_t *tpl = tuple_alloc(u,l);
 
     integer i = 0;
     ucell_t *ee = e;
 
     for(; !isnil(ee); ee = cdr(ee), i++ ) {
-        utuple_set(u, ttpl, i, car(ee));
+        utuple_set(u, tpl, i, car(ee));
     }
+
+    return tpl;
+}
+
+struct ucell *tuple(struct ulisp *u, size_t size, ...) {
+    ucell_t *tpl = tuple_alloc(u, size);
+
+    va_list ap;
+    va_start(ap, size);
+
+    size_t i = 0;
+    for(;i < size; i++ ) {
+        utuple_set(u, tpl, i, va_arg(ap, struct ucell*));
+    }
+
+    va_end(ap);
 
     return tpl;
 }
@@ -268,14 +289,7 @@ struct ulisp *ulisp_create( void *mem
     return l;
 }
 
-static void __dealloc_hstr_item(void *l_, void *k, void *v) {
-    struct ulisp *l = l_;
-    struct ustring *s = *(struct ustring**)k;
-    l->dealloc(l->allocator, s);
-}
-
 void ulisp_destroy( struct ulisp *l ) {
-    hash_enum(l->hstr, l, __dealloc_hstr_item);
     hash_destroy(l->hstr);
     l->dealloc(l->allocator, l->hstr);
 }
@@ -326,6 +340,15 @@ void ucell_walk( struct ulisp *ulisp
                , struct ucell *cell
                , struct ucell_walk_cb *cb ) {
     ucell_walk_rec(ulisp, cell, cb, 0);
+}
+
+static void ulisp_bind_one(struct ulisp *u, ucell_t *bind) {
+    fprintf(stderr, "ulisp_bind_one\n");
+}
+
+void ulisp_bind(struct ulisp *u, ucell_t *bindlist) {
+    ucell_t *e = bindlist;
+    for(; e; e = cdr(e) ) ulisp_bind_one(u, car(e));
 }
 
 // parser

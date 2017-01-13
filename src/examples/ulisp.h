@@ -15,6 +15,8 @@ struct ulisp *ulisp_create( void *mem
 
 void ulisp_destroy( struct ulisp *ulisp );
 
+void ulisp_bind(struct ulisp *u, ucell_t *bindlist);
+
 struct ulisp_parser;
 size_t ulisp_parser_size();
 
@@ -71,7 +73,10 @@ umake_stringlike((u), ATOM, mk_cstring_reader(pstacktmp(struct cstring_reader), 
 #define integer(u, i) umake((u), INTEGER, 1, (struct ucell*)(i))
 #define cons(u, a, b) umake((u), CONS, 2, (a), (b))
 
+#define bind(u,n,what) tuple((u), 2, atom((u), (n)), (what))
+
 struct ucell *list(struct ulisp *u, ...);
+struct ucell *tuple(struct ulisp *u, size_t size, ...);
 
 struct ucell_walk_cb {
     void *cc;

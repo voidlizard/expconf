@@ -38,6 +38,16 @@ static void show_parse_error( void *cc
 }
 
 
+static struct ucell_walk_cb walk_cb = { .cc = 0
+                                      , .on_list_start = print_list_start
+                                      , .on_list_end   = print_list_end
+                                      , .on_integer    = print_int
+                                      , .on_atom       = print_atom
+                                      , .on_string     = print_str
+                                      , .on_nil        = print_nil
+                                      };
+
+
 int main(int argc, char *argv[]) {
 
     if( argc < 2 ) {
@@ -56,27 +66,15 @@ int main(int argc, char *argv[]) {
                                   , example_dealloc
                                   );
 
+
     assert( u );
 
-    struct ucell_walk_cb cb = { .cc = 0
-                              , .on_list_start = print_list_start
-                              , .on_list_end   = print_list_end
-                              , .on_integer    = print_int
-                              , .on_atom       = print_atom
-                              , .on_string     = print_str
-                              , .on_nil        = print_nil
-                              };
+    struct ucell *binds = list(u, bind(u, "i42", integer(u, 42))
+                                , bind(u, "i43", integer(u, 43))
+                                , nil
+                              );
 
-    struct ucell *cell = list(u, integer(u, 1)
-                               , integer(u, 2)
-                               , integer(u, 3)
-                               , cstring(u, "JOPA")
-                               , list(u, atom(u, "A"), atom(u, "B"), nil)
-                               , atom(u, "end")
-                               , nil );
-
-    ucell_walk(u, cell, &cb);
-    fprintf(stdout, "\n");
+    ulisp_bind(u, binds);
 
     char pmem[ulisp_parser_size()];
 
@@ -99,9 +97,6 @@ int main(int argc, char *argv[]) {
     }
 
     struct ucell *top = ulisp_parse_top(p, file);
-
-    ucell_walk(u, top, &cb);
-    fprintf(stdout, "\n");
 
     ulisp_eval_top(u, top);
 

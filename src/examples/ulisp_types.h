@@ -9,6 +9,7 @@ typedef enum {
    , ATOM
    , STRING
    , TUPLE
+   , PRIMOP
 } ucell_type;
 
 struct ulisp;
