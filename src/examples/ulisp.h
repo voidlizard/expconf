@@ -58,6 +58,7 @@ size_t ustring_length(struct ucell *us);
 const char *ustring_cstr(struct ucell *us);
 
 integer ucell_intval(struct ucell *us);
+void* ucell_tuple_get(ucell_t *tuple, size_t n);
 
 #define nil ((void*)0)
 #define isnil(c) ((c) == nil)

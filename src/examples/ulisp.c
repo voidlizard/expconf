@@ -60,6 +60,37 @@ integer ucell_intval(struct ucell *us) {
     return ucell_int(us);
 }
 
+
+static inline void utuple_set(struct ucell *t, size_t i, ucell_t *v) {
+    struct utuple *tpl = utuple_val(t);
+
+    if( !tpl ) {
+        // FIXME: error?
+        assert(0);
+        return;
+    }
+
+    if( i < tpl->len ) {
+        tpl->t[i] = v;
+    } else {
+        // FIXME: error?
+        assert(0);
+    }
+}
+
+static inline ucell_t *utuple_get(struct ucell *t, size_t i) {
+    struct utuple *tpl = utuple_val(t);
+    if( !tpl ) {
+        // FIXME: error?
+        return nil;
+    }
+    return i < tpl->len ? tpl->t[i] : nil;
+}
+
+void* ucell_tuple_get(ucell_t *tuple, size_t i) {
+    return utuple_get(tuple,i);
+}
+
 static inline size_t arity(struct ucell *expr) {
     if( isnil(expr) )
         return 0;
@@ -153,32 +184,6 @@ static inline size_t utuple_len(struct ulisp *u, struct ucell *t) {
     return tpl->len;
 }
 
-static inline void utuple_set(struct ulisp *u, struct ucell *t, size_t i, ucell_t *v) {
-    struct utuple *tpl = utuple_val(t);
-
-    if( !tpl ) {
-        // FIXME: error?
-        assert(0);
-        return;
-    }
-
-    if( i < tpl->len ) {
-        tpl->t[i] = v;
-    } else {
-        // FIXME: error?
-        assert(0);
-    }
-}
-
-static inline ucell_t *utuple_get(struct ulisp *u, struct ucell *t, size_t i) {
-    struct utuple *tpl = utuple_val(t);
-    if( !tpl ) {
-        // FIXME: error?
-        return nil;
-    }
-    return i < tpl->len ? tpl->t[i] : nil;
-}
-
 static integer __list_length(ucell_t *e) {
     integer l = 0;
     for(; !isnil(e); e = cdr(e) ) l++;
@@ -209,7 +214,7 @@ static ucell_t *tuplecons(struct ulisp *u, ucell_t *e, bool eval) {
     ucell_t *ee = e;
 
     for(; !isnil(ee); ee = cdr(ee), i++ ) {
-        utuple_set(u, tpl, i, eval ? ulisp_eval_expr(u, car(ee)) : car(ee));
+        utuple_set(tpl, i, eval ? ulisp_eval_expr(u, car(ee)) : car(ee));
     }
 
     return tpl;
@@ -223,7 +228,7 @@ struct ucell *tuple(struct ulisp *u, size_t size, ...) {
 
     size_t i = 0;
     for(;i < size; i++ ) {
-        utuple_set(u, tpl, i, va_arg(ap, struct ucell*));
+        utuple_set(tpl, i, va_arg(ap, struct ucell*));
     }
 
     va_end(ap);
@@ -505,8 +510,8 @@ static void ulisp_bind_one(struct ulisp *u, ucell_t *bind) {
     }
 
     struct udict_key ktmp = { 0 };
-    struct udict_key *k = udict_key_init(&ktmp, utuple_get(u, bind, 0));
-    ucell_t *value = utuple_get(u, bind, 1);
+    struct udict_key *k = udict_key_init(&ktmp, utuple_get(bind, 0));
+    ucell_t *value = utuple_get(bind, 1);
 
     if( !k ) {
         // FIXME: error notification
@@ -763,7 +768,7 @@ struct ucell *ulisp_parse_top( struct ulisp_parser *p, void *what ) {
 
 ucell_t *apply_tuple( struct ulisp *u, ucell_t *tuple ) {
 
-    ucell_t *expr = utuple_get(u, tuple, 0);
+    ucell_t *expr = utuple_get(tuple, 0);
 
     if( isnil(tuple) || isnil(expr) ) {
         // FIXME: error
