@@ -65,7 +65,7 @@ int succ(void *c, int n) {
     return n;
 }
 
-ULISP_WRAPPER(succ,int,int)
+ULISP_WRAPPER_DECL(succ,int,int)
 
 int main(int argc, char *argv[]) {
 

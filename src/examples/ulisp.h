@@ -57,15 +57,11 @@ struct ucell *umake_stringlike( struct ulisp *u
 size_t ustring_length(struct ucell *us);
 const char *ustring_cstr(struct ucell *us);
 
+integer ucell_intval(struct ucell *us);
+
 #define nil ((void*)0)
 #define isnil(c) ((c) == nil)
 
-#define setcar(cell, v) (cell)->data[0] = (v)
-#define setcdr(cell, v) (cell)->data[1] = (v)
-#define car(cell) (cell)->data[0]
-#define cdr(cell) (cell)->data[1]
-
-#define ucell_int(cell) ((integer)car((cell)))
 
 #define cstring(u, s) \
 umake_stringlike((u), STRING, mk_cstring_reader(pstacktmp(struct cstring_reader), (s)))

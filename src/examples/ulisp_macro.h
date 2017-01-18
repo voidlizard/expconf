@@ -48,7 +48,7 @@ do {\
 #define ULISP_UNWRAP(_0,i,type) ULISP_UNWRAP_(type, arg##i)
 #define ULISP_UNWRAP_(t,n) ULISP_UNWRAP__##t(n)
 
-#define ULISP_UNWRAP__int(n) ucell_int(n)
+#define ULISP_UNWRAP__int(n) ucell_intval(n)
 
 #define CELLCELL(_,i,_1) ucell_t* arg##i
 
@@ -56,14 +56,14 @@ do {\
 
 #define UNWRAPPED_ARGS(...) CHAOS_PP_TUPLE_AUTO_FOR_EACH_I(ULISP_UNWRAP, (__VA_ARGS__))
 
-#define ULISP_WRAPPER(fun,ret,...) \
+#define ULISP_WRAPPER_DECL(fun,ret,...) \
 static ucell_t* ULISP_WRAPPER_NAME(fun)( struct ulisp *u\
                                        , struct ulisp_primop *op\
                                        COMMA_PREP(__VA_ARGS__)\
                                        CHAOS_PP_TUPLE_AUTO_FOR_EACH_I(CELLCELL, (__VA_ARGS__))\
                                        ) {\
     ret (*call)(void* COMMA_PREP(__VA_ARGS__) __VA_ARGS__) = (op)->callee;\
-    return ULISP_WRAP(ret, callee((op->cc) COMMA_PREP(__VA_ARGS__) UNWRAPPED_ARGS(__VA_ARGS__) ));\
+    return ULISP_WRAP(ret, call((op)->callee_cc COMMA_PREP(__VA_ARGS__) UNWRAPPED_ARGS(__VA_ARGS__) ));\
 }\
 
 

@@ -8,6 +8,13 @@
 #include "hashfun_murmur.h"
 #include "stringlike.h"
 
+#define setcar(cell, v) (cell)->data[0] = (v)
+#define setcdr(cell, v) (cell)->data[1] = (v)
+#define car(cell) (cell)->data[0]
+#define cdr(cell) (cell)->data[1]
+
+#define ucell_int(cell) ((integer)car((cell)))
+
 #define cstring_tok(u, s) \
 umake_stringlike((u), STRING, mk_strchunk_reader(pstacktmp(struct strchunk_reader), (s)))
 
@@ -48,6 +55,10 @@ struct udict_key {
 
 #define utuple_val(e) (((e)->tp == TUPLE) ? ((utuple_t*)(e)->data) : 0)
 #define uprimop_val(e) (((e)->tp == PRIMOP) ? ((struct ulisp_primop*)(e)->data[0]) : 0)
+
+integer ucell_intval(struct ucell *us) {
+    return ucell_int(us);
+}
 
 static inline size_t arity(struct ucell *expr) {
     if( isnil(expr) )
