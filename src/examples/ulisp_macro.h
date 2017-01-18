@@ -45,19 +45,25 @@ do {\
 #define ULISP_WRAP_(type,val) ULISP_WRAP##__##type(val)
 #define ULISP_WRAP__int(value) integer(u, (size_t)value)
 
+#define ULISP_UNWRAP(_0,i,type) ULISP_UNWRAP_(type, arg##i)
+#define ULISP_UNWRAP_(t,n) ULISP_UNWRAP__##t(n)
 
-#define CELLCELL(...) jopa
+#define ULISP_UNWRAP__int(n) ucell_int(n)
 
+#define CELLCELL(_,i,_1) ucell_t* arg##i
 
-/*                                       CHAOS_PP_EXPR(CHAOS_PP_FOR_EACH(CELLCELL, __VA_ARGS__))\*/
+#define COMMA_PREP(...) CHAOS_PP_COMMA_IF(CHAOS_PP_LIST_IS_NIL(__VA_ARGS__))
+
+#define UNWRAPPED_ARGS(...) CHAOS_PP_TUPLE_AUTO_FOR_EACH_I(ULISP_UNWRAP, (__VA_ARGS__))
 
 #define ULISP_WRAPPER(fun,ret,...) \
 static ucell_t* ULISP_WRAPPER_NAME(fun)( struct ulisp *u\
                                        , struct ulisp_primop *op\
-                                       CHAOS_PP_COMMA_IF(CHAOS_PP_LIST_IS_NIL(__VA_ARGS__))\
-                                       CHAOS_PP_SEQ_FOR_EACH(FUCK, __VA_ARGS__)\
+                                       COMMA_PREP(__VA_ARGS__)\
+                                       CHAOS_PP_TUPLE_AUTO_FOR_EACH_I(CELLCELL, (__VA_ARGS__))\
                                        ) {\
-    return ULISP_WRAP(ret, 0);\
+    ret (*call)(void* COMMA_PREP(__VA_ARGS__) __VA_ARGS__) = (op)->callee;\
+    return ULISP_WRAP(ret, callee((op->cc) COMMA_PREP(__VA_ARGS__) UNWRAPPED_ARGS(__VA_ARGS__) ));\
 }\
 
 
