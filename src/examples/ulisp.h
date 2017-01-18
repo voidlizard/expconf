@@ -74,7 +74,10 @@ umake_stringlike((u), ATOM, mk_cstring_reader(pstacktmp(struct cstring_reader), 
 
 #define bind(u,n,what) tuple((u), 2, atom((u), (n)), (what))
 
-#define primop(u, op) umake((u), PRIMOP, 1, (op))
+#define primop(u, op) primop0((u),(op))
+#define primopcc(u,op,cc) primop0((u),(op),(cc))
+#define primop0(u,op) umake((u), PRIMOP, 2, (op), 0)
+#define primop1(u,op,cc) umake((u), PRIMOP, 2, (op), (cc))
 
 struct ucell *list(struct ulisp *u, ...);
 struct ucell *tuple(struct ulisp *u, size_t size, ...);
