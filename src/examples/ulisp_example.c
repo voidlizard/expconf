@@ -3,6 +3,7 @@
 #include <errno.h>
 
 #include "ulisp.h"
+#include "ulisp_bind.h"
 #include "examples_common.h"
 
 void print_nil( void *cc ) {
@@ -47,7 +48,7 @@ static struct ucell_walk_cb walk_cb = { .cc = 0
                                       , .on_nil        = print_nil
                                       };
 
-static ucell_t *__display( struct ulisp *u, ucell_t *rs ) {
+static ucell_t *__display( struct ulisp *u, struct ulisp_primop *op, ucell_t *rs ) {
     fprintf(stdout, "%s\n", ustring_cstr(rs));
     return nil;
 }
@@ -59,6 +60,12 @@ static struct ulisp_primop  __primop_display = { .arity = 1
                                                , .tp = UNIT
                                                , .argtp = { STRING }
                                                };
+
+int succ(void *c, int n) {
+    return n;
+}
+
+ULISP_WRAPPER(succ,int,int)
 
 int main(int argc, char *argv[]) {
 

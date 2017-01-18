@@ -7,16 +7,17 @@
 
 #define CELLVAL(x,y,cc) utuple_get(u, cc, CHAOS_PP_INC(y))
 
+
 #define PRIMOPCALLEE(N, W, OP) \
-    struct ucell* (*W)(struct ulisp *u CHAOS_PP_COMMA_IF(N)\
+    struct ucell* (*W)(struct ulisp*, struct ulisp_primop* CHAOS_PP_COMMA_IF(N)\
                          CHAOS_PP_EXPR(CHAOS_PP_DELINEATE_FROM_TO_PARAMETRIC(0, N, CHAOS_PP_COMMA, CELLTYPE, 0))\
                          ) = op->wrapper
 
 #define MKPRIMOPCALLOF(n,tuple) {\
 struct ulisp_primop *op = uprimop_val(utuple_get(u, tuple, 0));\
 PRIMOPCALLEE(n, wrap, op);\
-return wrap(u CHAOS_PP_COMMA_IF(n)\
-              CHAOS_PP_EXPR(CHAOS_PP_DELINEATE_FROM_TO_PARAMETRIC(0, n, CHAOS_PP_COMMA, CELLVAL, tuple))\
+return wrap(u, op CHAOS_PP_COMMA_IF(n)\
+                  CHAOS_PP_EXPR(CHAOS_PP_DELINEATE_FROM_TO_PARAMETRIC(0, n, CHAOS_PP_COMMA, CELLVAL, tuple))\
            );\
 }
 
@@ -36,5 +37,28 @@ do {\
             assert(0);\
     }\
 } while(0)
+
+
+#define ULISP_WRAPPER_NAME(name) __##name##_ulisp
+
+#define ULISP_WRAP(type,val) ULISP_WRAP_(type,val)
+#define ULISP_WRAP_(type,val) ULISP_WRAP##__##type(val)
+#define ULISP_WRAP__int(value) integer(u, (size_t)value)
+
+
+#define CELLCELL(...) jopa
+
+
+/*                                       CHAOS_PP_EXPR(CHAOS_PP_FOR_EACH(CELLCELL, __VA_ARGS__))\*/
+
+#define ULISP_WRAPPER(fun,ret,...) \
+static ucell_t* ULISP_WRAPPER_NAME(fun)( struct ulisp *u\
+                                       , struct ulisp_primop *op\
+                                       CHAOS_PP_COMMA_IF(CHAOS_PP_LIST_IS_NIL(__VA_ARGS__))\
+                                       CHAOS_PP_SEQ_FOR_EACH(FUCK, __VA_ARGS__)\
+                                       ) {\
+    return ULISP_WRAP(ret, 0);\
+}\
+
 
 #endif

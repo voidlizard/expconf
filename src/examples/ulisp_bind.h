@@ -2,6 +2,7 @@
 #define __ulisp_bind_h
 
 #include "ulisp_types.h"
+#include "ulisp_macro.h"
 
 struct ulisp_primop {
     uint8_t arity;
