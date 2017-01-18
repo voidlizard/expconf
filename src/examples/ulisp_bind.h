@@ -6,11 +6,12 @@
 
 struct ulisp_primop {
     uint8_t arity;
-    void *callee_cc;
     void *callee;
     void *wrapper;
     ucell_type tp;
     ucell_type argtp[ULISP_PRIMOP_MAX_ARITY+1];
 };
+
+typedef const char* cstr;
 
 #endif

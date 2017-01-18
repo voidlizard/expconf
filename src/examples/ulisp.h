@@ -62,7 +62,6 @@ integer ucell_intval(struct ucell *us);
 #define nil ((void*)0)
 #define isnil(c) ((c) == nil)
 
-
 #define cstring(u, s) \
 umake_stringlike((u), STRING, mk_cstring_reader(pstacktmp(struct cstring_reader), (s)))
 
@@ -75,9 +74,12 @@ umake_stringlike((u), ATOM, mk_cstring_reader(pstacktmp(struct cstring_reader), 
 #define bind(u,n,what) tuple((u), 2, atom((u), (n)), (what))
 
 #define primop(u, op) primop0((u),(op))
-#define primopcc(u,op,cc) primop0((u),(op),(cc))
+#define primopcc(u,op,cc) primop1((u),(op),(cc))
 #define primop0(u,op) umake((u), PRIMOP, 2, (op), 0)
 #define primop1(u,op,cc) umake((u), PRIMOP, 2, (op), (cc))
+
+struct ulisp_primop *ucell_primop(ucell_t *e);
+void *ucell_primop_context(ucell_t *e);
 
 struct ucell *list(struct ulisp *u, ...);
 struct ucell *tuple(struct ulisp *u, size_t size, ...);

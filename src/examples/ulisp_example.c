@@ -48,24 +48,29 @@ static struct ucell_walk_cb walk_cb = { .cc = 0
                                       , .on_nil        = print_nil
                                       };
 
-static ucell_t *__display( struct ulisp *u, struct ulisp_primop *op, ucell_t *rs ) {
+static ucell_t *__display( struct ulisp *u, ucell_t *op, ucell_t *rs ) {
     fprintf(stdout, "%s\n", ustring_cstr(rs));
     return nil;
 }
 
+
 static struct ulisp_primop  __primop_display = { .arity = 1
-                                               , .callee_cc = 0
                                                , .callee = 0
                                                , .wrapper = __display
                                                , .tp = UNIT
                                                , .argtp = { STRING }
                                                };
 
-int succ(void *c, int n) {
+static int succ(void *c, int n) {
     return n;
 }
 
+static void print_strln(void *c, cstr str) {
+    fprintf(stdout, "%s%s\n", c ? (char*)c : "", str);
+}
+
 ULISP_WRAPPER_DECL(succ,int,int)
+ULISP_WRAPPER_DECL(print_strln, void, cstr)
 
 int main(int argc, char *argv[]) {
 
@@ -89,6 +94,9 @@ int main(int argc, char *argv[]) {
     assert( u );
 
     struct ucell *binds = list(u, bind(u, "display", primop(u, &__primop_display))
+                                , bind(u, "print-strln",  primop(u, &ULISP_PRIMOP_VAR(print_strln)))
+                                , bind(u, "print-strln1",  primopcc(u, &ULISP_PRIMOP_VAR(print_strln),"(CONTEXT!) "))
+                                , bind(u, "succ", primop(u, &ULISP_PRIMOP_VAR(succ)))
                                 , bind(u, "__VERSION__", cstring(u, "ulisp 0.1.0-alpha"))
                                 , nil
                               );

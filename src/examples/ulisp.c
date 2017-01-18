@@ -54,10 +54,17 @@ struct udict_key {
 };
 
 #define utuple_val(e) (((e)->tp == TUPLE) ? ((utuple_t*)(e)->data) : 0)
-#define uprimop_val(e) (((e)->tp == PRIMOP) ? ((struct ulisp_primop*)(e)->data[0]) : 0)
 
 integer ucell_intval(struct ucell *us) {
     return ucell_int(us);
+}
+
+struct ulisp_primop *ucell_primop(ucell_t *e) {
+    return (!isnil(e) && e->tp == PRIMOP) ? (void*)e->data[0] : 0;
+}
+
+void *ucell_primop_context(ucell_t *e) {
+    return (!isnil(e) && e->tp == PRIMOP) ? (void*)e->data[1] : 0;
 }
 
 static inline size_t arity(struct ucell *expr) {
@@ -65,8 +72,10 @@ static inline size_t arity(struct ucell *expr) {
         return 0;
 
     switch( expr->tp ) {
-        case PRIMOP:
-            return uprimop_val(expr)->arity;
+        case PRIMOP: {
+            struct ulisp_primop *op = ucell_primop(expr);
+            return op ? op->arity : 0;
+        }
 
         default:
             return 0;

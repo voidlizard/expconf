@@ -1,3 +1,4 @@
 (display (__VERSION__))
 (display "HELLO WORLD")
-(display "ABABAA")
+(print-strln  "PRINT-STRLN")
+(print-strln1 "PRINT-STRLN1")
