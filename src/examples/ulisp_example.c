@@ -73,9 +73,20 @@ static void print_strln2(cstr str1, cstr str2) {
     fprintf(stdout, "%s%s\n", str1, str2);
 }
 
+// polymorphic function example
+static void display(object u_, ucellp_t what) {
+    fprintf(stdout, "%s", ustring_cstr(ucell_to_string(u_, what)));
+}
+
+static void newline() {
+    fprintf(stdout, "\n");
+}
+
 ULISP_WRAPPER_DECL(succ,int,int)
 ULISP_WRAPPER_DECL(print_strln, void, cstr)
 ULISP_WRAPPER_DECL(print_strln2, void, cstr, cstr)
+ULISP_WRAPPER_DECL(display, void, object, ucellp_t)
+ULISP_WRAPPER_DECL(newline, void)
 
 int main(int argc, char *argv[]) {
 
@@ -102,6 +113,8 @@ int main(int argc, char *argv[]) {
                                 , bind(u, "println2", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 1, cstring(u,"FREE1 ")))
                                 , bind(u, "println3", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 0))
                                 , bind(u, "println4", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 2, cstring(u,"A"), cstring(u,"B")))
+                                , bind(u, "display",  closure(u, primop(u, &ULISP_PRIMOP_VAR(display)), 1, object(u,u)))
+                                , bind(u, "newline",  closure(u, primop(u, &ULISP_PRIMOP_VAR(newline)), 0))
                                 , bind(u, "__VERSION__", cstring(u, "ulisp-0.1-alpha"))
                                 , nil);
 

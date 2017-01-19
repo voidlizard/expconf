@@ -3,6 +3,8 @@
 
 #include <chaos/preprocessor.h>
 
+#define TPL(...) CHAOS_PP_IF(CHAOS_PP_IS_EMPTY(CHAOS_PP_TUPLE_HEAD((__VA_ARGS__))))(CHAOS_PP_TUPLE_NIL(),(__VA_ARGS__))
+
 #define CELLTYPE(...) struct ucell*
 
 #define CELLVAL(x,y,cc) utuple_get(u, cc, CHAOS_PP_INC(y))
@@ -47,12 +49,15 @@ do {\
 #define ULISP_WRAP__int(value) integer(u, (size_t)(value))
 #define ULISP_WRAP__cstr(value) cstring(u, value)
 #define ULISP_WRAP__void(value) (value), nil
+#define ULISP_WRAP__object(value) object(u, (value))
 
 #define ULISP_UNWRAP(_0,i,type) ULISP_UNWRAP_(type, arg##i)
 #define ULISP_UNWRAP_(t,n) ULISP_UNWRAP__##t(n)
 
 #define ULISP_UNWRAP__int(n) ucell_intval((n))
 #define ULISP_UNWRAP__cstr(n) ustring_cstr((n))
+#define ULISP_UNWRAP__ucellp_t(n) (n)
+#define ULISP_UNWRAP__object(n) ucell_object((n))
 
 #define ULISP_WRAP_TYPE(tp) ULISP_WRAP_TYPE_(tp)
 #define ULISP_WRAP_TYPE_(tp) ULISP_WRAP_TYPE__##tp
@@ -61,33 +66,33 @@ do {\
 #define ULISP_WRAP_TYPE__int INTEGER
 #define ULISP_WRAP_TYPE__primop PRIMOP
 #define ULISP_WRAP_TYPE__cstr STRING
+#define ULISP_WRAP_TYPE__ucellp_t ANY
+#define ULISP_WRAP_TYPE__object OBJECT
 
 #define ULISP_UNWRAP_SEP(_0,i,type) CHAOS_PP_COMMA_IF(i) ULISP_UNWRAP(_0,i,type)
 
 #define WRAPTYPE(_,i,type) CHAOS_PP_COMMA_IF(i) ULISP_WRAP_TYPE(type)
 #define CELLCELL(_,i,_1) ,ucell_t* arg##i
 
-#define COMMA_PREP(...) CHAOS_PP_COMMA_IF(CHAOS_PP_GREATER(CHAOS_PP_TUPLE_SIZE((__VA_ARGS__)),1))
+#define COMMA_PREP(...) CHAOS_PP_COMMA_IF(CHAOS_PP_TUPLE_CONS(TPL(__VA_ARGS__)))
 
-#define UNWRAPPED_ARGS(...) CHAOS_PP_TUPLE_AUTO_FOR_EACH_I(ULISP_UNWRAP_SEP, (__VA_ARGS__))
-
-
+#define UNWRAPPED_ARGS(...) CHAOS_PP_TUPLE_AUTO_FOR_EACH_I(ULISP_UNWRAP_SEP, TPL(__VA_ARGS__))
 
 
 #define ULISP_WRAPPER_DECL(fun,ret,...) \
 static ucell_t* ULISP_WRAPPER_NAME(fun)( struct ulisp *u\
                                        , struct ulisp_primop *op\
-                                       CHAOS_PP_TUPLE_AUTO_FOR_EACH_I(CELLCELL, (__VA_ARGS__))\
+                                       CHAOS_PP_TUPLE_AUTO_FOR_EACH_I(CELLCELL, TPL(__VA_ARGS__))\
                                        ) {\
     ret (*call)(__VA_ARGS__) = (op)->callee;\
     return ULISP_WRAP(ret, call(UNWRAPPED_ARGS(__VA_ARGS__)));\
 }\
 static struct ulisp_primop ULISP_PRIMOP_VAR(fun) = {\
-    .arity = CHAOS_PP_TUPLE_SIZE((__VA_ARGS__))\
+    .arity = CHAOS_PP_TUPLE_SIZE(TPL(__VA_ARGS__))\
   , .callee = fun\
   , .wrapper = ULISP_WRAPPER_NAME(fun)\
   , .tp = ULISP_WRAP_TYPE(ret)\
-  , .argtp = { CHAOS_PP_TUPLE_AUTO_FOR_EACH_I(WRAPTYPE, (__VA_ARGS__)) }\
+  , .argtp = { CHAOS_PP_TUPLE_AUTO_FOR_EACH_I(WRAPTYPE, TPL(__VA_ARGS__)) }\
 };
 
 #endif

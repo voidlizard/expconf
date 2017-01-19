@@ -12,6 +12,7 @@ typedef enum {
    , TUPLE
    , CLOSURE
    , PRIMOP
+   , ANY
    , OBJECT
 } ucell_type;
 
@@ -20,6 +21,8 @@ struct ucell;
 struct utuple;
 
 typedef struct ucell ucell_t;
+typedef ucell_t* ucellp_t;
 typedef struct utuple utuple_t;
+typedef void* object;
 
 #endif

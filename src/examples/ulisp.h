@@ -52,7 +52,8 @@ struct ucell *umake(struct ulisp *u, ucell_type tp, size_t n, ...);
 
 struct ucell *umake_stringlike( struct ulisp *u
                               , ucell_type tp
-                              , struct stringreader *rd );
+                              , struct stringreader *rd
+                              , bool cache );
 
 size_t ustring_length(struct ucell *us);
 const char *ustring_cstr(struct ucell *us);
@@ -60,16 +61,25 @@ const char *ustring_cstr(struct ucell *us);
 const char *ucell_typename( ucell_type tp );
 const char *ulisp_typename( struct ulisp *u, ucell_t *cell );
 
+ucellp_t ucell_to_string(struct ulisp *, ucellp_t);
+
 integer ucell_intval(struct ucell *us);
+object ucell_object(ucell_t *us);
 
 #define nil ((void*)0)
 #define isnil(c) ((c) == nil)
 
 #define cstring(u, s) \
-umake_stringlike((u), STRING, mk_cstring_reader(pstacktmp(struct cstring_reader), (s)))
+umake_stringlike((u), STRING, mk_cstring_reader(pstacktmp(struct cstring_reader), (s)), true)
 
 #define atom(u, s) \
-umake_stringlike((u), ATOM, mk_cstring_reader(pstacktmp(struct cstring_reader), (s)))
+umake_stringlike((u), ATOM, mk_cstring_reader(pstacktmp(struct cstring_reader), (s)), true)
+
+#define cstring_(u, s) \
+umake_stringlike((u), STRING, mk_cstring_reader(pstacktmp(struct cstring_reader), (s)), false)
+
+#define atom_(u, s) \
+umake_stringlike((u), ATOM, mk_cstring_reader(pstacktmp(struct cstring_reader), (s)), false)
 
 #define integer(u, i) umake((u), INTEGER, 1, (struct ucell*)(i))
 #define cons(u, a, b) umake((u), CONS, 2, (a), (b))

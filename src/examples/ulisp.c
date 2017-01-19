@@ -16,10 +16,10 @@
 #define ucell_int(cell) ((integer)car((cell)))
 
 #define cstring_tok(u, s) \
-umake_stringlike((u), STRING, mk_strchunk_reader(pstacktmp(struct strchunk_reader), (s)))
+umake_stringlike((u), STRING, mk_strchunk_reader(pstacktmp(struct strchunk_reader), (s)), true)
 
 #define atom_tok(u, s) \
-umake_stringlike((u), ATOM, mk_strchunk_reader(pstacktmp(struct strchunk_reader), (s)))
+umake_stringlike((u), ATOM, mk_strchunk_reader(pstacktmp(struct strchunk_reader), (s)), true)
 
 struct ulisp {
 
@@ -59,6 +59,10 @@ static inline int arity(struct ulisp *u, struct ucell *expr);
 
 integer ucell_intval(struct ucell *us) {
     return ucell_int(us);
+}
+
+object ucell_object(ucell_t *us) {
+    return car(us);
 }
 
 struct ulisp_primop *ucell_primop(ucell_t *e) {
@@ -287,7 +291,8 @@ static inline ucell_t *udict_lookup(struct ulisp *u, ucell_t *expr ) {
 
 struct ucell *umake_stringlike( struct ulisp *u
                               , ucell_type tp
-                              , struct stringreader *rd ) {
+                              , struct stringreader *rd
+                              , bool cache ) {
 
     size_t size = sizeof(struct ucell)
                 + sizeof(struct ustring)
@@ -310,6 +315,10 @@ struct ucell *umake_stringlike( struct ulisp *u
     size_t i = 0;
     for( ;rd->readchar(rd->cs, &chr); i++ ) {
         us->data[i] = (char)chr;
+    }
+
+    if( !cache ) {
+        return cell;
     }
 
     struct ucell **r = hash_get(u->hstr, &cell);
@@ -765,6 +774,10 @@ static inline void ulisp_expr_typecheck( struct ulisp *u, ucell_type tp, ucell_t
     if( isnil(expr) )
         return;
 
+    if( tp == ANY ) {
+        return;
+    }
+
     if( tp == expr->tp ) {
         return;
     }
@@ -855,7 +868,7 @@ ucell_t *ulisp_eval_expr( struct ulisp *u, ucell_t *expr ) {
             if( isnil(e) ) {
                 // FIXME: error handling
                 fprintf(stderr, "*** error (runtime): unbound symbol %s\n", ustring_cstr(expr));
-                return nil;
+                assert(0);
             }
             return e;
         }
@@ -928,4 +941,54 @@ const char *ulisp_typename( struct ulisp *u, ucell_t *cell ) {
 
     return ucell_typename(cell->tp);
 }
+
+ucellp_t ucell_to_string(struct ulisp *u, ucellp_t expr) {
+
+    if( isnil(expr) ) {
+        return cstring(u,"(#nil)");
+    }
+
+    switch( expr->tp ) {
+        case UNIT:
+            return cstring(u,"(#unit)");
+
+        case CONS:
+            return cstring(u,"(#cons...)");
+
+        case INTEGER: {
+            char tmp[256];
+            snprintf(tmp, sizeof(tmp), "%ld", ucell_intval(expr));
+            return cstring_(u,tmp);
+        }
+
+        case ATOM:
+            return expr;
+
+        case STRING:
+            return expr;
+
+        case TUPLE:
+            return cstring(u,"(#tuple)");
+
+        case CLOSURE: {
+            char tmp[256];
+            snprintf(tmp, sizeof(tmp), "(#closure %p)", car(expr));
+            return cstring_(u,tmp);
+        }
+
+        case PRIMOP: {
+            char tmp[256];
+            snprintf(tmp, sizeof(tmp), "(#primop %p)", ucell_primop(expr));
+            return cstring_(u, tmp);
+        }
+
+        case OBJECT:
+            return cstring(u,"(#object)");
+
+        default:
+            return cstring(u, "(#unknown-object)");
+    }
+
+}
+
 
