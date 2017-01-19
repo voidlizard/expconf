@@ -57,6 +57,7 @@ struct ucell *umake_stringlike( struct ulisp *u
 size_t ustring_length(struct ucell *us);
 const char *ustring_cstr(struct ucell *us);
 
+const char *ucell_typename( ucell_type tp );
 const char *ulisp_typename( struct ulisp *u, ucell_t *cell );
 
 integer ucell_intval(struct ucell *us);

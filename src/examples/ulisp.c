@@ -759,6 +759,23 @@ static inline int arity(struct ulisp *u, struct ucell *expr) {
     }
 }
 
+static inline void ulisp_expr_typecheck( struct ulisp *u, ucell_type tp, ucell_t *expr ) {
+
+    // NIL ~> any type?
+    if( isnil(expr) )
+        return;
+
+    if( tp == expr->tp ) {
+        return;
+    }
+
+    // FIXME: error handling
+    fprintf(stderr, "*** error (runtime): type error %s ~ %s\n"
+                  , ulisp_typename(u,expr)
+                  , ucell_typename(tp));
+    assert(0);
+}
+
 static inline ucell_t *apply_list( struct ulisp *u, ucell_t *expr) {
 
     ucell_t *appl = ulisp_eval_expr(u, car(expr));
@@ -811,6 +828,13 @@ static inline ucell_t *apply_list( struct ulisp *u, ucell_t *expr) {
     }
 
     if( fun->tp == PRIMOP ) {
+
+        int j = 1;
+        struct ulisp_primop *op = ucell_primop(fun);
+        for(; j <= ar; j++ ) {
+            ulisp_expr_typecheck(u, op->argtp[j-1], utuple_get(u, call, j));
+        }
+
         GENERATE_PRIMOP_CALL(ULISP_PRIMOP_MAX_ARITY, call);
     }
 
@@ -881,12 +905,8 @@ const char *ulisp_parse_err_str(ulisp_parser_err err) {
     }
 }
 
-const char *ulisp_typename( struct ulisp *u, ucell_t *cell ) {
-    if( isnil(cell) ) {
-        return "NIL";
-    }
-
-    switch( cell->tp ) {
+const char *ucell_typename( ucell_type tp ) {
+    switch( tp ) {
         case UNIT: return "UNIT";
         case CONS: return "CONS";
         case INTEGER: return "INTEGER";
@@ -899,5 +919,13 @@ const char *ulisp_typename( struct ulisp *u, ucell_t *cell ) {
     }
 
     assert(0);
+}
+
+const char *ulisp_typename( struct ulisp *u, ucell_t *cell ) {
+    if( isnil(cell) ) {
+        return "NIL";
+    }
+
+    return ucell_typename(cell->tp);
 }
 
