@@ -47,7 +47,7 @@ do {\
 #define ULISP_WRAP(type,val) ULISP_WRAP_(type,val)
 #define ULISP_WRAP_(type,val) ULISP_WRAP##__##type(val)
 #define ULISP_WRAP__int(value) integer(u, (size_t)(value))
-#define ULISP_WRAP__cstr(value) cstring(u, value)
+#define ULISP_WRAP__cstr(value) cstring_(u, value)
 #define ULISP_WRAP__void(value) (value), nil
 #define ULISP_WRAP__object(value) object(u, (value))
 #define ULISP_WRAP__ucellp_t(value) (value)
