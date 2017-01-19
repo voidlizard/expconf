@@ -50,6 +50,7 @@ do {\
 #define ULISP_WRAP__cstr(value) cstring(u, value)
 #define ULISP_WRAP__void(value) (value), nil
 #define ULISP_WRAP__object(value) object(u, (value))
+#define ULISP_WRAP__ucellp_t(value) (value)
 
 #define ULISP_UNWRAP(_0,i,type) ULISP_UNWRAP_(type, arg##i)
 #define ULISP_UNWRAP_(t,n) ULISP_UNWRAP__##t(n)

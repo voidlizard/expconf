@@ -61,6 +61,13 @@ static struct ulisp_primop  __primop_display = { .arity = 1
                                                , .argtp = { STRING }
                                                };
 
+
+static ucellp_t getenv_safe(object u, cstr name) {
+    char *env = getenv((char*)name);
+    if( !env ) return nil;
+    return cstring_(u, env);
+}
+
 static int succ(int n) {
     return n+1;
 }
@@ -92,6 +99,7 @@ ULISP_WRAPPER_DECL(print_strln, void, cstr)
 ULISP_WRAPPER_DECL(print_strln2, void, cstr, cstr)
 ULISP_WRAPPER_DECL(display, void, object, ucellp_t)
 ULISP_WRAPPER_DECL(newline, void)
+ULISP_WRAPPER_DECL(getenv_safe, ucellp_t, object, cstr)
 
 int main(int argc, char *argv[]) {
 
@@ -118,6 +126,8 @@ int main(int argc, char *argv[]) {
                                 , bind(u, "println2", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 1, cstring(u,"FREE1 ")))
                                 , bind(u, "println3", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 0))
                                 , bind(u, "println4", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 2, cstring(u,"A"), cstring(u,"B")))
+
+                                , bind(u, "getenv",   closure(u, primop(u, &ULISP_PRIMOP_VAR(getenv_safe)), 1, object(u,u)))
                                 , bind(u, "display",  closure(u, primop(u, &ULISP_PRIMOP_VAR(display)), 1, object(u,u)))
                                 , bind(u, "newline",  closure(u, primop(u, &ULISP_PRIMOP_VAR(newline)), 0))
                                 , bind(u, "succ",     closure(u, primop(u, &ULISP_PRIMOP_VAR(succ)), 0))
