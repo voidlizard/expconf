@@ -69,17 +69,19 @@ object ucell_object(ucell_t *us);
 #define nil ((void*)0)
 #define isnil(c) ((c) == nil)
 
+#define ornil(v,e) ((v)?(e):nil)
+
 #define cstring(u, s) \
-umake_stringlike((u), STRING, mk_cstring_reader(pstacktmp(struct cstring_reader), (s)), true)
+ornil((s),umake_stringlike((u), STRING, mk_cstring_reader(pstacktmp(struct cstring_reader), (char*)(s)), true))
 
 #define atom(u, s) \
-umake_stringlike((u), ATOM, mk_cstring_reader(pstacktmp(struct cstring_reader), (s)), true)
+ornil((s),umake_stringlike((u), ATOM, mk_cstring_reader(pstacktmp(struct cstring_reader), (char*)(s)), true))
 
 #define cstring_(u, s) \
-umake_stringlike((u), STRING, mk_cstring_reader(pstacktmp(struct cstring_reader), (s)), false)
+ornil((s),umake_stringlike((u), STRING, mk_cstring_reader(pstacktmp(struct cstring_reader), (char*)(s)), false))
 
 #define atom_(u, s) \
-umake_stringlike((u), ATOM, mk_cstring_reader(pstacktmp(struct cstring_reader), (s)), false)
+ornil((s),umake_stringlike((u), ATOM, mk_cstring_reader(pstacktmp(struct cstring_reader), (char*)(s)), false))
 
 #define integer(u, i) umake((u), INTEGER, 1, (struct ucell*)(i))
 #define cons(u, a, b) umake((u), CONS, 2, (a), (b))

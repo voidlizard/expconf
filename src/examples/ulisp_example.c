@@ -100,6 +100,7 @@ ULISP_WRAPPER_DECL(print_strln2, void, cstr, cstr)
 ULISP_WRAPPER_DECL(display, void, object, ucellp_t)
 ULISP_WRAPPER_DECL(newline, void)
 ULISP_WRAPPER_DECL(getenv_safe, ucellp_t, object, cstr)
+ULISP_WRAPPER_DECL(getenv, cstr, cstr) // from stdlib.h !
 
 int main(int argc, char *argv[]) {
 
@@ -127,7 +128,8 @@ int main(int argc, char *argv[]) {
                                 , bind(u, "println3", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 0))
                                 , bind(u, "println4", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 2, cstring(u,"A"), cstring(u,"B")))
 
-                                , bind(u, "getenv",   closure(u, primop(u, &ULISP_PRIMOP_VAR(getenv_safe)), 1, object(u,u)))
+/*                                , bind(u, "getenv",   closure(u, primop(u, &ULISP_PRIMOP_VAR(getenv_safe)), 1, object(u,u)))*/
+                                , bind(u, "getenv",   closure(u, primop(u, &ULISP_PRIMOP_VAR(getenv)), 0))
                                 , bind(u, "display",  closure(u, primop(u, &ULISP_PRIMOP_VAR(display)), 1, object(u,u)))
                                 , bind(u, "newline",  closure(u, primop(u, &ULISP_PRIMOP_VAR(newline)), 0))
                                 , bind(u, "succ",     closure(u, primop(u, &ULISP_PRIMOP_VAR(succ)), 0))
