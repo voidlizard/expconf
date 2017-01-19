@@ -5,7 +5,7 @@
 #include "ulisp_macro.h"
 
 struct ulisp_primop {
-    uint8_t arity;
+    int8_t arity;
     void *callee;
     void *wrapper;
     ucell_type tp;

@@ -57,6 +57,8 @@ struct ucell *umake_stringlike( struct ulisp *u
 size_t ustring_length(struct ucell *us);
 const char *ustring_cstr(struct ucell *us);
 
+const char *ulisp_typename( struct ulisp *u, ucell_t *cell );
+
 integer ucell_intval(struct ucell *us);
 
 #define nil ((void*)0)
@@ -73,13 +75,11 @@ umake_stringlike((u), ATOM, mk_cstring_reader(pstacktmp(struct cstring_reader), 
 
 #define bind(u,n,what) tuple((u), 2, atom((u), (n)), (what))
 
-#define primop(u, op) primop0((u),(op))
-#define primopcc(u,op,cc) primop1((u),(op),(cc))
-#define primop0(u,op) umake((u), PRIMOP, 2, (op), 0)
-#define primop1(u,op,cc) umake((u), PRIMOP, 2, (op), (cc))
+#define closure(u, code, n, ...) umake((u), CLOSURE, 1, tuple((u), (n)+1, code, ##__VA_ARGS__))
+
+#define primop(u, op) umake((u), PRIMOP, 1, (op))
 
 struct ulisp_primop *ucell_primop(ucell_t *e);
-void *ucell_primop_context(ucell_t *e);
 
 struct ucell *list(struct ulisp *u, ...);
 struct ucell *tuple(struct ulisp *u, size_t size, ...);

@@ -55,31 +55,14 @@ struct udict_key {
 
 #define utuple_val(e) (((e)->tp == TUPLE) ? ((utuple_t*)(e)->data) : 0)
 
+static inline int arity(struct ulisp *u, struct ucell *expr);
+
 integer ucell_intval(struct ucell *us) {
     return ucell_int(us);
 }
 
 struct ulisp_primop *ucell_primop(ucell_t *e) {
     return (!isnil(e) && e->tp == PRIMOP) ? (void*)e->data[0] : 0;
-}
-
-void *ucell_primop_context(ucell_t *e) {
-    return (!isnil(e) && e->tp == PRIMOP) ? (void*)e->data[1] : 0;
-}
-
-static inline size_t arity(struct ucell *expr) {
-    if( isnil(expr) )
-        return 0;
-
-    switch( expr->tp ) {
-        case PRIMOP: {
-            struct ulisp_primop *op = ucell_primop(expr);
-            return op ? op->arity : 0;
-        }
-
-        default:
-            return 0;
-    }
 }
 
 static struct ucell *ucell_alloc(struct ulisp *u, size_t bytes) {
@@ -205,22 +188,6 @@ static ucell_t *tuple_alloc(struct ulisp *u, size_t n) {
     struct utuple *ttpl = utuple_val(tpl);
 
     ttpl->len = n;
-    return tpl;
-}
-
-static ucell_t *tuplecons(struct ulisp *u, ucell_t *e, bool eval) {
-
-    integer l = __list_length(e);
-
-    ucell_t *tpl = tuple_alloc(u,l);
-
-    integer i = 0;
-    ucell_t *ee = e;
-
-    for(; !isnil(ee); ee = cdr(ee), i++ ) {
-        utuple_set(u, tpl, i, eval ? ulisp_eval_expr(u, car(ee)) : car(ee));
-    }
-
     return tpl;
 }
 
@@ -769,32 +736,89 @@ struct ucell *ulisp_parse_top( struct ulisp_parser *p, void *what ) {
 }
 
 
+static inline int arity(struct ulisp *u, struct ucell *expr) {
+    if( isnil(expr) )
+        return 0;
 
-ucell_t *apply_tuple( struct ulisp *u, ucell_t *tuple ) {
+    switch( expr->tp ) {
+        case PRIMOP: {
+            struct ulisp_primop *op = ucell_primop(expr);
+            return op ? op->arity : 0;
+        }
 
-    ucell_t *expr = utuple_get(u, tuple, 0);
+        case CLOSURE: {
+            ucell_t *tpl = car(expr);
+            // FIXME: error handle?
+            int ar = arity(u, utuple_get(u, tpl, 0));
+            int free = utuple_len(u, tpl)-1;
+            return ar - free;
+        }
 
-    if( isnil(tuple) || isnil(expr) ) {
-        // FIXME: error
-        fprintf(stderr, "*** error (runtime): can't apply nil\n");
-        return nil;
+        default:
+            return 0;
     }
-
-    size_t ar = utuple_len(u, tuple)-1;
-    if( ar != arity(expr) ) {
-        // FIXME: error
-        fprintf(stderr, "*** error (runtime): arity mismatch %ld ~ %ld\n", ar, arity(expr));
-        return nil;
-    }
-
-    if( expr->tp == PRIMOP ) {
-        GENERATE_PRIMOP_CALL(ULISP_PRIMOP_MAX_ARITY, tuple);
-        return nil;
-    }
-
-    return expr;
 }
 
+static inline ucell_t *apply_list( struct ulisp *u, ucell_t *expr) {
+
+    ucell_t *appl = ulisp_eval_expr(u, car(expr));
+    ucell_t *args = cdr(expr);
+
+    if( isnil(appl) ) {
+        // FIXME: error
+        fprintf(stderr, "*** error (runtime): can't apply nil\n");
+        assert(0);
+    }
+
+    if( appl->tp != CLOSURE ) {
+        if( !isnil(args) ) {
+            // FIXME: error
+            fprintf(stderr, "*** error (runtime): bad application (%s)\n", ulisp_typename(u,appl));
+            assert(0);
+        }
+        return appl;
+    }
+
+    // args  - arguments list
+    // car(appl) - call, callee + free vars
+
+    ucell_t *tuple = car(appl);
+
+    ucell_t *fun = utuple_get(u, tuple, 0);
+
+    int  ar = arity(u, fun);
+    int  freevars = utuple_len(u, tuple) - 1;
+
+    ucell_t *call = tuple_alloc(u, ar+1);
+
+    utuple_set(u, call, 0, fun);
+
+    int i = 1;
+    for(; i <= freevars; i++ ) {
+        utuple_set(u, call, i, utuple_get(u, tuple, i));
+    }
+
+    ucell_t *arg = args;
+    for(; i <= ar && !isnil(arg); arg = cdr(arg), i++ ) {
+        utuple_set(u, call, i, ulisp_eval_expr(u, car(arg)));
+    }
+
+    int ar1 = i-1 + (isnil(arg) ? 0 : 1);
+    if( ar1 != ar ) {
+        // FIXME: error handling or ... ?
+        fprintf(stderr, "*** error (runtime): call arity mismatch %d ~ %d\n", ar, ar1 );
+        assert(0);
+    }
+
+    if( fun->tp == PRIMOP ) {
+        GENERATE_PRIMOP_CALL(ULISP_PRIMOP_MAX_ARITY, call);
+    }
+
+    // FIXME: error handling
+    fprintf(stderr, "*** error (runtime): unsupported application of %s\n"
+                  , ulisp_typename(u,fun));
+    assert(0);
+}
 
 ucell_t *ulisp_eval_expr( struct ulisp *u, ucell_t *expr ) {
 
@@ -819,7 +843,7 @@ ucell_t *ulisp_eval_expr( struct ulisp *u, ucell_t *expr ) {
             return expr;
 
         case CONS:
-            return apply_tuple(u, tuplecons(u, expr, true));
+            return apply_list(u, expr);
 
         default:
             assert(0);
@@ -855,5 +879,25 @@ const char *ulisp_parse_err_str(ulisp_parser_err err) {
         default:
             return "unknown parse error";
     }
+}
+
+const char *ulisp_typename( struct ulisp *u, ucell_t *cell ) {
+    if( isnil(cell) ) {
+        return "NIL";
+    }
+
+    switch( cell->tp ) {
+        case UNIT: return "UNIT";
+        case CONS: return "CONS";
+        case INTEGER: return "INTEGER";
+        case ATOM: return "ATOM";
+        case STRING: return "STRING";
+        case TUPLE: return "TUPLE";
+        case PRIMOP: return "PRIMOP";
+        case CLOSURE: return "CLOSURE";
+        case OBJECT: return "OBJECT";
+    }
+
+    assert(0);
 }
 

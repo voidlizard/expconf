@@ -61,16 +61,21 @@ static struct ulisp_primop  __primop_display = { .arity = 1
                                                , .argtp = { STRING }
                                                };
 
-static int succ(void *c, int n) {
+static int succ(int n) {
     return n;
 }
 
-static void print_strln(void *c, cstr str) {
-    fprintf(stdout, "%s%s\n", c ? (char*)c : "", str);
+static void print_strln(cstr str) {
+    fprintf(stdout, "%s\n", str);
+}
+
+static void print_strln2(cstr str1, cstr str2) {
+    fprintf(stdout, "%s%s\n", str1, str2);
 }
 
 ULISP_WRAPPER_DECL(succ,int,int)
 ULISP_WRAPPER_DECL(print_strln, void, cstr)
+ULISP_WRAPPER_DECL(print_strln2, void, cstr, cstr)
 
 int main(int argc, char *argv[]) {
 
@@ -93,15 +98,16 @@ int main(int argc, char *argv[]) {
 
     assert( u );
 
-    struct ucell *binds = list(u, bind(u, "display", primop(u, &__primop_display))
-                                , bind(u, "print-strln",  primop(u, &ULISP_PRIMOP_VAR(print_strln)))
-                                , bind(u, "print-strln1",  primopcc(u, &ULISP_PRIMOP_VAR(print_strln),"(CONTEXT!) "))
-                                , bind(u, "succ", primop(u, &ULISP_PRIMOP_VAR(succ)))
-                                , bind(u, "__VERSION__", cstring(u, "ulisp 0.1.0-alpha"))
-                                , nil
-                              );
+    struct ucell *binds = list(u, bind(u, "println", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln)), 0))
+                                , bind(u, "println2", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 1, cstring(u,"FREE1 ")))
+                                , bind(u, "println3", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 0))
+                                , bind(u, "println4", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 2, cstring(u,"A"), cstring(u,"B")))
+                                , bind(u, "__VERSION__", cstring(u, "ulisp-0.1-alpha"))
+                                , nil);
+
 
     ulisp_bind(u, binds);
+
 
     char pmem[ulisp_parser_size()];
 
