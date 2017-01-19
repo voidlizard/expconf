@@ -62,7 +62,11 @@ static struct ulisp_primop  __primop_display = { .arity = 1
                                                };
 
 static int succ(int n) {
-    return n;
+    return n+1;
+}
+
+static int sum(int a, int b) {
+    return a+b;
 }
 
 static void print_strln(cstr str) {
@@ -83,6 +87,7 @@ static void newline() {
 }
 
 ULISP_WRAPPER_DECL(succ,int,int)
+ULISP_WRAPPER_DECL(sum,int,int,int)
 ULISP_WRAPPER_DECL(print_strln, void, cstr)
 ULISP_WRAPPER_DECL(print_strln2, void, cstr, cstr)
 ULISP_WRAPPER_DECL(display, void, object, ucellp_t)
@@ -115,6 +120,8 @@ int main(int argc, char *argv[]) {
                                 , bind(u, "println4", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 2, cstring(u,"A"), cstring(u,"B")))
                                 , bind(u, "display",  closure(u, primop(u, &ULISP_PRIMOP_VAR(display)), 1, object(u,u)))
                                 , bind(u, "newline",  closure(u, primop(u, &ULISP_PRIMOP_VAR(newline)), 0))
+                                , bind(u, "succ",     closure(u, primop(u, &ULISP_PRIMOP_VAR(succ)), 0))
+                                , bind(u, "+",        closure(u, primop(u, &ULISP_PRIMOP_VAR(sum)), 0))
                                 , bind(u, "__VERSION__", cstring(u, "ulisp-0.1-alpha"))
                                 , nil);
 
