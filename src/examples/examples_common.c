@@ -7,10 +7,13 @@
 #include <string.h>
 
 void *example_alloc(void *cc, size_t size) {
-    return malloc(size);
+    void *mem = malloc(size);
+/*    fprintf(stderr, "allocated %ld %p\n", size, mem);*/
+    return mem;
 }
 
 void example_dealloc(void *cc, void *mem) {
+/*    fprintf(stderr, "deallocated %p\n", mem);*/
     free(mem);
 }
 

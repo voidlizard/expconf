@@ -4,6 +4,7 @@
 
 #include "ulisp.h"
 #include "ulisp_bind.h"
+#include "static_mem_pool.h"
 #include "examples_common.h"
 
 void print_nil( void *cc ) {
@@ -93,14 +94,19 @@ static void newline() {
     fprintf(stdout, "\n");
 }
 
-ULISP_WRAPPER_DECL(succ,int,int)
-ULISP_WRAPPER_DECL(sum,int,int,int)
-ULISP_WRAPPER_DECL(print_strln, void, cstr)
-ULISP_WRAPPER_DECL(print_strln2, void, cstr, cstr)
-ULISP_WRAPPER_DECL(display, void, object, ucellp_t)
-ULISP_WRAPPER_DECL(newline, void)
-ULISP_WRAPPER_DECL(getenv_safe, ucellp_t, object, cstr)
-ULISP_WRAPPER_DECL(getenv, cstr, cstr) // from stdlib.h !
+static void nomem(void *u_) {
+    fprintf(stderr, "*** error (runtime): out of memory\n");
+    assert(0);
+}
+
+ULISP_PRIMOP(succ,int,int)
+ULISP_PRIMOP(sum,int,int,int)
+ULISP_PRIMOP(print_strln, void, cstr)
+ULISP_PRIMOP(print_strln2, void, cstr, cstr)
+ULISP_PRIMOP(display, void, object, ucellp_t)
+ULISP_PRIMOP(newline, void)
+ULISP_PRIMOP(getenv_safe, ucellp_t, object, cstr)
+ULISP_PRIMOP(getenv, cstr, cstr) // from stdlib.h !
 
 int main(int argc, char *argv[]) {
 
@@ -113,13 +119,23 @@ int main(int argc, char *argv[]) {
 
     char ulisp_mem[ulisp_size()];
 
+    struct static_mem_pool pool;
+
+    void *pp = static_mem_pool_init( &pool
+                                   , 8192 - sizeof(struct static_mem_pool)
+                                   , 0
+                                   , nomem
+                                   , 0
+                                   , example_alloc
+                                   , example_dealloc );
+
+
     struct ulisp *u = ulisp_create( ulisp_mem
                                   , sizeof(ulisp_mem)
-                                  , 0
-                                  , example_alloc
-                                  , example_dealloc
+                                  , &pool
+                                  , static_mem_pool_alloc
+                                  , static_mem_pool_dealloc
                                   );
-
 
     assert( u );
 
@@ -167,6 +183,7 @@ __exit:
 
     ulisp_parser_destroy(p);
     ulisp_destroy(u);
+    static_mem_pool_destroy(&pool);
     fclose(file);
 
     return 0;

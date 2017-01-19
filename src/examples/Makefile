@@ -11,6 +11,7 @@ CHAOS_PP_DIR:=$(TOP)/../contrib/chaos-pp
 MISCDATA_SOURCES+=hash.c
 MISCDATA_SOURCES+=slist.c
 MISCDATA_SOURCES+=hashfun_murmur.c
+MISCDATA_SOURCES+=static_mem_pool.c
 
 EXPCONF_DIR:=..
 EXPCONF_SOURCES+= expconf.c

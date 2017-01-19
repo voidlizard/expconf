@@ -79,8 +79,7 @@ do {\
 
 #define UNWRAPPED_ARGS(...) CHAOS_PP_TUPLE_AUTO_FOR_EACH_I(ULISP_UNWRAP_SEP, TPL(__VA_ARGS__))
 
-
-#define ULISP_WRAPPER_DECL(fun,ret,...) \
+#define ULISP_PRIMOP(fun,ret,...) \
 static ucell_t* ULISP_WRAPPER_NAME(fun)( struct ulisp *u\
                                        , struct ulisp_primop *op\
                                        CHAOS_PP_TUPLE_AUTO_FOR_EACH_I(CELLCELL, TPL(__VA_ARGS__))\
