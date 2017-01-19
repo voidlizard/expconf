@@ -78,6 +78,7 @@ umake_stringlike((u), ATOM, mk_cstring_reader(pstacktmp(struct cstring_reader), 
 #define closure(u, code, n, ...) umake((u), CLOSURE, 1, tuple((u), (n)+1, code, ##__VA_ARGS__))
 
 #define primop(u, op) umake((u), PRIMOP, 1, (op))
+#define object(u, obj) umake((u), OBJECT, 1, (obj))
 
 struct ulisp_primop *ucell_primop(ucell_t *e);
 
