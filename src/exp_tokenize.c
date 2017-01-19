@@ -458,6 +458,8 @@ struct exp_token * exp_tokenizer_next( struct exp_tokenizer *t
 
         if( is_dec_digit(0, *pc) ) {
 
+            integer_init(t, 10);
+
             if( *pc != '0' ) {
                 integer_init(t, 10);
                 integer_acc(t, *pc);
@@ -476,14 +478,8 @@ struct exp_token * exp_tokenizer_next( struct exp_tokenizer *t
                 }
             }
 
-            if( t->intval.digits > 0 ) {
-                unsigned char *pcc = __readchar(t);
-                if( !pcc || is_token_term(0, *pcc) ) {
-                    __unread(t);
-                    emit_token(t, TOK_INTEGER, &t->intval.value, tok);
-                    return tok;
-                }
-            }
+            __unread(t);
+            emit_token(t, TOK_INTEGER, &t->intval.value, tok);
             return tok;
         }
 
