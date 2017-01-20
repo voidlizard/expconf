@@ -36,6 +36,8 @@ struct udict_key {
 
 #define utuple_val(e) (((e)->tp == TUPLE) ? ((utuple_t*)(e)->data) : 0)
 
+static void ulisp_bind_one(struct ulisp *u, ucell_t *bind);
+static inline ucell_t *udict_lookup(struct ulisp *u, ucell_t *expr );
 static inline int arity(struct ulisp *u, struct ucell *expr);
 
 static inline void eval_error( struct ulisp *u
@@ -45,7 +47,18 @@ static inline void eval_error( struct ulisp *u
 
     void *ctx = 0; // TODO: extract context from e
     u->errors++;
-    safecall(unit, u->error_fn, u->error_cc, err, ctx, msg);
+
+    ucell_t *wtf = ulisp_eval_expr(u, atom(u, "__UNIT__"));
+
+    char tmp[ULISP_MAX_ERROR_MSG];
+    snprintf(tmp, sizeof(tmp), "%s:%d", ustring_cstr(wtf), e->lno);
+    safecall(unit, u->error_fn, u->error_cc, err, tmp, msg);
+
+    if( u->abrt ) {
+        longjmp( *u->abrt, 1);
+    }
+
+    exit(-1);
 }
 
 static inline void eval_error_application( struct ulisp *u
@@ -136,6 +149,7 @@ static struct ucell *umake_nil(struct ulisp *u, ucell_type tp, size_t n) {
         return nil;
 
     cell->tp = tp;
+    cell->lno = 0;
 
     return cell;
 }
@@ -389,6 +403,7 @@ size_t ulisp_size() {
 
 struct ulisp *ulisp_create( void *mem
                           , size_t memsize
+                          , jmp_buf *abrt
                           , void *err_cc
                           , ulisp_on_eval_error efn
                           , void *allocator
@@ -405,6 +420,7 @@ struct ulisp *ulisp_create( void *mem
 
     SET_ALLOCATOR(l, allocator, alloc, dealloc);
 
+    l->abrt = abrt;
     l->error_cc = err_cc;
     l->error_fn = efn;
 
@@ -461,6 +477,8 @@ struct ulisp *ulisp_create( void *mem
                          , l->alloc
                          , l->dealloc );
 
+
+    ulisp_bind_one(l, bind(l, "__UNIT__", cstring(l, "<unit>")));
     return l;
 }
 
@@ -563,33 +581,6 @@ void ulisp_bind(struct ulisp *u, ucell_t *bindlist) {
 
 // parser
 
-struct ulisp_parser {
-    read_char_fn readfn;
-
-    void *allocator;
-    alloc_function_t alloc;
-    dealloc_function_t dealloc;
-    struct ulisp *u;
-
-    struct {
-        struct exp_token   mem;
-        struct exp_token  *curr;
-        struct exp_token  *back;
-    } token;
-
-    struct {
-        size_t lno;
-        void *cc;
-        bool eof;
-    } rdr;
-
-    struct exp_tokenizer *tokenizer;
-    void *on_err_cc;
-    ulisp_parser_err_fn on_err;
-    int errors;
-
-};
-
 size_t ulisp_parser_size() {
     return sizeof(struct ulisp_parser);
 }
@@ -671,7 +662,14 @@ static void reset_tokenizer( struct ulisp_parser *p, void *reader ) {
 static void parse_error( struct ulisp_parser *p
                        , ulisp_parser_err err
                        , const char *msg) {
-    safecall(unit, p->on_err, p->on_err_cc, err, p->rdr.lno, msg);
+
+    struct ulisp *u = p->u;
+    ucell_t *wtf = ulisp_eval_expr(u, atom(u, "__UNIT__"));
+
+    char tmp[ULISP_MAX_ERROR_MSG];
+    snprintf(tmp, sizeof(tmp), "%s:%d", ustring_cstr(wtf), (int)p->rdr.lno);
+
+    safecall(unit, p->on_err, p->on_err_cc, err, tmp, msg);
     p->errors++;
 }
 
@@ -693,7 +691,7 @@ static struct ucell *parse_list( struct ulisp_parser *p ) {
     token_unget(p);
 
     struct ucell *car = parse_expr(p, nil);
-    return cons(u, car, parse_list(p));
+    return setlno(p, cons(u, car, parse_list(p)));
 }
 
 static struct ucell *parse_expr( struct ulisp_parser *p, struct ucell *top ) {
@@ -715,32 +713,32 @@ static struct ucell *parse_expr( struct ulisp_parser *p, struct ucell *top ) {
                 continue;
 
             case TOK_INTEGER:
-                return integer(u, tok->v.intval);
+                return setlno(p, integer(u, tok->v.intval));
 
             case TOK_STRING:
-                return cstring_tok(u, tok->v.strval);
+                return setlno(p, cstring_tok(u, tok->v.strval));
 
             case TOK_ATOM:
-                return atom_tok(u, tok->v.atom);
+                return setlno(p, atom_tok(u, tok->v.atom));
 
             case TOK_OPAREN:
-                return parse_list(p);
+                return setlno(p, parse_list(p));
 
             case TOK_CPAREN:
                 parse_error(p, ERR__UNBALANCED_PAREN, "");
                 return nil;
 
             case TOK_SQUOT:
-                return quote(u, parse_expr(p, top));
+                return setlno(p, quote(u, parse_expr(p, top)));
 
             case TOK_DOT:
-                return atom(u, ",");
+                return setlno(p,atom(u, ","));
 
             case TOK_COMMA:
-                return atom(u, ",");
+                return setlno(p, atom(u, ","));
 
             case TOK_SEMI:
-                return atom(u, ";");
+                return setlno(p, atom(u, ";"));
 
             case TOK_ERROR:
                 parse_error(p, ERR__INVALID_TOKEN, "");
@@ -911,7 +909,7 @@ static inline ucell_t *apply_list( struct ulisp *u, ucell_t *expr) {
 
 ucell_t *ulisp_eval_expr( struct ulisp *u, ucell_t *expr ) {
 
-    if( isnil(expr) || u->errors )
+    if( isnil(expr) )
         return nil;
 
     switch( expr->tp ) {
@@ -944,7 +942,7 @@ void ulisp_eval_top( struct ulisp *u, struct ucell *top ) {
 
     ucell_t *expr = top;
 
-    for( ; !u->errors && expr; expr = cdr(expr) ) {
+    for( ; expr; expr = cdr(expr) ) {
 
         if( isnil(car(expr)) || car(expr)->tp != CONS ) {
             eval_error_toplevel_syntax(u, expr);

@@ -21,10 +21,12 @@ typedef enum {
 size_t ulisp_size();
 
 typedef void* eval_context;
-typedef void (*ulisp_on_eval_error)(void*,ulisp_eval_err,eval_context,const char *);
+typedef void (*ulisp_on_eval_error)(void*,ulisp_eval_err,eval_context,const char*);
+typedef void (*ulisp_parser_err_fn)(void *,ulisp_parser_err,eval_context,const char*);
 
 struct ulisp *ulisp_create( void *mem
                           , size_t memsize
+                          , jmp_buf *abrt
                           , void *err_cc
                           , ulisp_on_eval_error
                           , void *allocator
@@ -39,7 +41,6 @@ struct ulisp_parser;
 size_t ulisp_parser_size();
 
 
-typedef void (*ulisp_parser_err_fn)(void *cc, ulisp_parser_err err, size_t lno, const char *misc);
 
 const char *ulisp_parse_err_str(ulisp_parser_err err);
 

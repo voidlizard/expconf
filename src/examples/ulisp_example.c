@@ -34,10 +34,10 @@ void print_list_end( void *cc ) {
 
 static void show_parse_error( void *cc
                             , ulisp_parser_err err
-                            , size_t lno
+                            , eval_context ectx
                             , const char *misc) {
 
-    fprintf(stderr, "*** error (parse) %ld: %s\n", lno, ulisp_parse_err_str(err));
+    fprintf(stderr, "%s error (parse): %s; %s\n", (const char*)ectx, ulisp_parse_err_str(err), misc);
 }
 
 static void on_eval_error( void *cc
@@ -45,9 +45,8 @@ static void on_eval_error( void *cc
                          , eval_context ectx
                          , const char *msg ) {
 
-
-    // TODO: handle ctx to extract line number ?
-    fprintf(stderr, "*** error (eval, %s) : %s\n", ulisp_eval_err_str(err), msg);
+    const char *ctx = ectx;
+    fprintf(stderr, "%s error: (eval, %s) : %s\n", ctx, ulisp_eval_err_str(err), msg);
 }
 
 static struct ucell_walk_cb walk_cb = { .cc = 0
@@ -111,6 +110,8 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    int errors = 0;
+
     const char *fname = argv[1];
 
     char ulisp_mem[ulisp_size()];
@@ -129,8 +130,15 @@ int main(int argc, char *argv[]) {
     FILE *file = 0;
     struct ulisp_parser *p = 0;
 
+    jmp_buf env;
+    if( setjmp(env) ) {
+        errors++;
+        goto _fin;
+    }
+
     struct ulisp *u =  ulisp_create( ulisp_mem
                                    , sizeof(ulisp_mem)
+                                   , &env
                                    , 0
                                    , on_eval_error
                                    , &pool
@@ -153,6 +161,7 @@ int main(int argc, char *argv[]) {
                           , bind(u, "succ",     closure(u, primop(u, &ULISP_PRIMOP_VAR(succ)), 0))
                           , bind(u, "+",        closure(u, primop(u, &ULISP_PRIMOP_VAR(sum)), 0))
                           , bind(u, "__VERSION__", cstring(u, "ulisp-0.1-alpha"))
+                          , bind(u, "__UNIT__", cstring(u, fname))
                           , nil);
 
         ulisp_bind(u, binds);
@@ -177,20 +186,20 @@ int main(int argc, char *argv[]) {
         }
 
         struct ucell *top = ulisp_parse_top(p, file);
+        ulisp_parser_destroy(p);
+
+        if( !top ) errors++;
 
         ulisp_eval_top(u, top);
 
-        goto __exit;
-
     } while(0);
 
-__exit:
+_fin:
 
-    ulisp_parser_destroy(p);
-    ulisp_destroy(u);
+    if( u ) ulisp_destroy(u);
+    if( file) fclose(file);
     static_mem_pool_destroy(&pool);
-    fclose(file);
 
-    return 0;
+    return !errors ? 0 : -1;
 }
 
