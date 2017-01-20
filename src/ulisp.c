@@ -281,7 +281,7 @@ const char *ustring_cstr(struct ucell *us) {
 
 static uint32_t __pustring_hash(void *a) {
     struct ucell *k = *(struct ucell**)a;
-    return hash_murmur3_32((unsigned char*)ustring_cstr(k), ustring_length(k), 0x00BEEF);
+    return hash_murmur3_32((unsigned char*)ustring_cstr(k), ustring_length(k), k->tp ^ 0xDEADBEEF);
 }
 
 static bool __pustring_eq(void *a, void *b) {
@@ -291,9 +291,10 @@ static bool __pustring_eq(void *a, void *b) {
     size_t k1len = ustring_length(k1);
     size_t k2len = ustring_length(k2);
 
-    return  k1len  == k2len && 0 == memcmp(ustring_cstr(k1), ustring_cstr(k2), k1len);
+    return  k1->tp == k2->tp
+         && k1len  == k2len
+         && 0 == memcmp(ustring_cstr(k1), ustring_cstr(k2), k1len);
 }
-
 
 void __pustring_cpy(void *a, void *b) {
     *(struct ucell**)a = *(struct ucell**)b;
