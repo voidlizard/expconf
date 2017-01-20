@@ -35,7 +35,7 @@ void print_list_end( void *cc ) {
 static void show_parse_error( void *cc
                             , ulisp_parser_err err
                             , size_t lno
-                            , char *misc) {
+                            , const char *misc) {
 
     fprintf(stderr, "*** error (parse) %ld: %s\n", lno, ulisp_parse_err_str(err));
 }
@@ -117,54 +117,61 @@ int main(int argc, char *argv[]) {
                                    , example_dealloc );
 
 
-    struct ulisp *u = ulisp_create( ulisp_mem
-                                  , sizeof(ulisp_mem)
-                                  , &pool
-                                  , static_mem_pool_alloc
-                                  , static_mem_pool_dealloc
-                                  );
+    FILE *file = 0;
+    struct ulisp_parser *p = 0;
 
+    struct ulisp *u =  ulisp_create( ulisp_mem
+                                   , sizeof(ulisp_mem)
+                                   , &pool
+                                   , static_mem_pool_alloc
+                                   , static_mem_pool_dealloc
+                                   );
     assert( u );
 
-    struct ucell *binds = list(u, bind(u, "println",  closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln)), 0))
-                                , bind(u, "println2", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 1, cstring(u,"FREE1 ")))
-                                , bind(u, "println3", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 0))
-                                , bind(u, "println4", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 2, cstring(u,"A"), cstring(u,"B")))
+    do {
 
-/*                                , bind(u, "getenv",   closure(u, primop(u, &ULISP_PRIMOP_VAR(getenv_safe)), 1, object(u,u)))*/
-                                , bind(u, "getenv",   closure(u, primop(u, &ULISP_PRIMOP_VAR(getenv)), 0))
-                                , bind(u, "display",  closure(u, primop(u, &ULISP_PRIMOP_VAR(display)), 1, object(u,u)))
-                                , bind(u, "newline",  closure(u, primop(u, &ULISP_PRIMOP_VAR(newline)), 0))
-                                , bind(u, "succ",     closure(u, primop(u, &ULISP_PRIMOP_VAR(succ)), 0))
-                                , bind(u, "+",        closure(u, primop(u, &ULISP_PRIMOP_VAR(sum)), 0))
-                                , bind(u, "__VERSION__", cstring(u, "ulisp-0.1-alpha"))
-                                , nil);
+        struct ucell *binds =
+            list(u, bind(u, "println",  closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln)), 0))
+                          , bind(u, "println2", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 1, cstring(u,"FREE1 ")))
+                          , bind(u, "println3", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 0))
+                          , bind(u, "println4", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 2, cstring(u,"A"), cstring(u,"B")))
+    /*                      , bind(u, "getenv",   closure(u, primop(u, &ULISP_PRIMOP_VAR(getenv_safe)), 1, object(u,u)))*/
+                          , bind(u, "getenv",   closure(u, primop(u, &ULISP_PRIMOP_VAR(getenv)), 0))
+                          , bind(u, "display",  closure(u, primop(u, &ULISP_PRIMOP_VAR(display)), 1, object(u,u)))
+                          , bind(u, "newline",  closure(u, primop(u, &ULISP_PRIMOP_VAR(newline)), 0))
+                          , bind(u, "succ",     closure(u, primop(u, &ULISP_PRIMOP_VAR(succ)), 0))
+                          , bind(u, "+",        closure(u, primop(u, &ULISP_PRIMOP_VAR(sum)), 0))
+                          , bind(u, "__VERSION__", cstring(u, "ulisp-0.1-alpha"))
+                          , nil);
 
-    ulisp_bind(u, binds);
+        ulisp_bind(u, binds);
 
-    char pmem[ulisp_parser_size()];
+        char pmem[ulisp_parser_size()];
+        p = ulisp_parser_create( pmem
+                               , sizeof(pmem)
+                               , file_read_char
+                               , 0
+                               , show_parse_error
+                               , 0
+                               , example_alloc
+                               , example_dealloc
+                               , u );
 
-    struct ulisp_parser *p = ulisp_parser_create( pmem
-                                                , sizeof(pmem)
-                                                , file_read_char
-                                                , 0
-                                                , show_parse_error
-                                                , 0
-                                                , example_alloc
-                                                , example_dealloc
-                                                , u );
 
+        file = fopen(fname, "rb");
 
-    FILE *file = fopen(fname, "rb");
+        if( !file ) {
+            fprintf(stderr, "*** fatal. %s: %s \n", fname, strerror(errno));
+            exit(-1);
+        }
 
-    if( !file ) {
-        fprintf(stderr, "*** fatal. %s: %s \n", fname, strerror(errno));
-        exit(-1);
-    }
+        struct ucell *top = ulisp_parse_top(p, file);
 
-    struct ucell *top = ulisp_parse_top(p, file);
+        ulisp_eval_top(u, top);
 
-    ulisp_eval_top(u, top);
+        goto __exit;
+
+    } while(0);
 
 __exit:
 

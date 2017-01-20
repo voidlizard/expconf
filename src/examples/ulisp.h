@@ -25,7 +25,7 @@ typedef enum {
   , ERR__INVALID_TOKEN
 } ulisp_parser_err;
 
-typedef void (*ulisp_parser_err_fn)(void *cc, ulisp_parser_err err, size_t lno, char *misc);
+typedef void (*ulisp_parser_err_fn)(void *cc, ulisp_parser_err err, size_t lno, const char *misc);
 
 const char *ulisp_parse_err_str(ulisp_parser_err err);
 

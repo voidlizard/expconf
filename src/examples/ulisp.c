@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdarg.h>
 
+#include "miscdata.h"
 #include "hash.h"
 #include "hashfun_murmur.h"
 #include "stringlike.h"
@@ -516,6 +517,7 @@ struct ulisp_parser {
     struct exp_tokenizer *tokenizer;
     void *on_err_cc;
     ulisp_parser_err_fn on_err;
+    int errors;
 
 };
 
@@ -549,6 +551,7 @@ struct ulisp_parser *ulisp_parser_create( void *mem
                                , .rdr = { 0 }
                                , .on_err_cc = efn_cc
                                , .on_err = efn
+                               , .errors = 0
                                };
 
 
@@ -584,25 +587,6 @@ static void token_unget( struct ulisp_parser *p ) {
     p->token.back = p->token.curr;
 }
 
-static bool __lno_reader_wrapper( void *cc, unsigned char *c ) {
-    struct ulisp_parser *p = cc;
-    unsigned char nc = 0;
-    bool ok = p->readfn(p->rdr.cc, &nc);
-
-    if( !ok ) {
-        p->rdr.eof = true;
-        return false;
-    }
-
-    *c = nc;
-
-    if( nc == '\n' ) {
-        p->rdr.lno++;
-    }
-
-    return ok;
-}
-
 static void reset_tokenizer( struct ulisp_parser *p, void *reader ) {
 
     destroy_tokenizer(p);
@@ -610,9 +594,16 @@ static void reset_tokenizer( struct ulisp_parser *p, void *reader ) {
     p->tokenizer = exp_tokenizer_create( p->allocator
                                        , p->alloc
                                        , p->dealloc
-                                       , p
-                                       , __lno_reader_wrapper );
+                                       , p->rdr.cc
+                                       , p->readfn );
 
+}
+
+static void parse_error( struct ulisp_parser *p
+                       , ulisp_parser_err err
+                       , const char *msg) {
+    safecall(unit, p->on_err, p->on_err_cc, err, p->rdr.lno, msg);
+    p->errors++;
 }
 
 static struct ucell *parse_expr( struct ulisp_parser *p, struct ucell *top );
@@ -622,7 +613,7 @@ static struct ucell *parse_list( struct ulisp_parser *p ) {
     struct exp_token *tok = token_get(p);
 
     if( !tok ) {
-        p->on_err(p->on_err_cc, ERR__UNBALANCED_PAREN, p->rdr.lno, "");
+        parse_error(p, ERR__UNBALANCED_PAREN, "");
         return nil;
     }
 
@@ -644,12 +635,14 @@ static struct ucell *parse_expr( struct ulisp_parser *p, struct ucell *top ) {
         struct ulisp *u = p->u;
 
         if( !tok ) {
+            p->rdr.eof = true;
             return nil;
         }
 
         switch( tok->tag ) {
 
             case TOK_NEWLINE:
+                p->rdr.lno++;
                 continue;
 
             case TOK_INTEGER:
@@ -665,7 +658,7 @@ static struct ucell *parse_expr( struct ulisp_parser *p, struct ucell *top ) {
                 return parse_list(p);
 
             case TOK_CPAREN:
-                p->on_err(p->on_err_cc, ERR__UNBALANCED_PAREN, p->rdr.lno, "");
+                parse_error(p, ERR__UNBALANCED_PAREN, "");
                 return nil;
 
             case TOK_SQUOT:
@@ -681,7 +674,7 @@ static struct ucell *parse_expr( struct ulisp_parser *p, struct ucell *top ) {
                 return atom(u, ";");
 
             case TOK_ERROR:
-                p->on_err(p->on_err_cc, ERR__INVALID_TOKEN, p->rdr.lno, "");
+                parse_error(p, ERR__INVALID_TOKEN, "");
                 return nil;
 
             default:
@@ -694,7 +687,8 @@ static struct ucell *parse_expr( struct ulisp_parser *p, struct ucell *top ) {
 }
 
 static struct ucell *ulisp_parse_(struct ulisp_parser *p) {
-    return parse_expr(p, list(p->u, nil));
+    ucell_t *e = parse_expr(p, list(p->u, nil));
+    return p->errors ? nil : e;
 }
 
 struct ucell *ulisp_parse( struct ulisp_parser *p, void *what ) {
@@ -727,7 +721,7 @@ struct ucell *ulisp_parse_top( struct ulisp_parser *p, void *what ) {
         }
     }
 
-    return head;
+    return p->errors ? nil : head;
 }
 
 

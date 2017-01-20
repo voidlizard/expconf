@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <setjmp.h>
 
 typedef ssize_t integer;
 
