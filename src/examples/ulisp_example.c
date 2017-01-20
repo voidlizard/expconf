@@ -40,6 +40,15 @@ static void show_parse_error( void *cc
     fprintf(stderr, "*** error (parse) %ld: %s\n", lno, ulisp_parse_err_str(err));
 }
 
+static void on_eval_error( void *cc
+                         , ulisp_eval_err err
+                         , eval_context ectx
+                         , const char *msg ) {
+
+
+    // TODO: handle ctx to extract line number ?
+    fprintf(stderr, "*** error (eval, %s) : %s\n", ulisp_eval_err_str(err), msg);
+}
 
 static struct ucell_walk_cb walk_cb = { .cc = 0
                                       , .on_list_start = print_list_start
@@ -122,6 +131,8 @@ int main(int argc, char *argv[]) {
 
     struct ulisp *u =  ulisp_create( ulisp_mem
                                    , sizeof(ulisp_mem)
+                                   , 0
+                                   , on_eval_error
                                    , &pool
                                    , static_mem_pool_alloc
                                    , static_mem_pool_dealloc

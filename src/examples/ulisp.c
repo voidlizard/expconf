@@ -38,6 +38,72 @@ struct udict_key {
 
 static inline int arity(struct ulisp *u, struct ucell *expr);
 
+static inline void eval_error( struct ulisp *u
+                             , ulisp_eval_err err
+                             , ucell_t *e
+                             , const char *msg ) {
+
+    void *ctx = 0; // TODO: extract context from e
+    u->errors++;
+    safecall(unit, u->error_fn, u->error_cc, err, ctx, msg);
+}
+
+static inline void eval_error_application( struct ulisp *u
+                                         , ucell_t *expr
+                                         , ucell_type *tp ) {
+
+
+    char tmp[256];
+    snprintf( tmp
+            , sizeof(tmp)
+            , "expected applicable, got %s"
+            , tp ? ucell_typename(*tp) : "#nil");
+
+    eval_error(u, ERR__EVAL_TYPE, expr, tmp);
+}
+
+static inline void eval_error_typecheck( struct ulisp *u
+                                       , ucell_t *ctx
+                                       , ucell_type tp
+                                       , ucell_t *e ) {
+
+    char tmp[256];
+    snprintf( tmp
+            , sizeof(tmp)
+            , "expected type %s, got %s"
+            , ucell_typename(tp)
+            , ulisp_typename(u, e));
+
+    eval_error(u, ERR__EVAL_TYPE, ctx, tmp);
+}
+
+static inline void eval_error_arity( struct ulisp *u
+                                   , ucell_t *expr
+                                   , int ar1
+                                   , int ar2
+                                   ) {
+
+    char tmp[256];
+    snprintf(tmp, sizeof(tmp), "expected arity %d, got %d", ar1, ar2);
+    eval_error(u, ERR__EVAL_ARITY, expr, tmp);
+}
+
+static inline void eval_error_unbound( struct ulisp *u
+                                     , ucell_t *expr ) {
+
+    char tmp[256];
+    snprintf(tmp, sizeof(tmp), "%s", ustring_cstr(expr));
+    eval_error(u, ERR__EVAL_UNBOUND, expr, tmp);
+}
+
+static inline void eval_error_toplevel_syntax( struct ulisp *u
+                                             , ucell_t *expr) {
+
+    char tmp[256];
+    snprintf(tmp, sizeof(tmp), "expression is not allowed at top-level");
+    eval_error(u, ERR__EVAL_TYPE, expr, tmp);
+}
+
 integer ucell_intval(struct ucell *us) {
     return ucell_int(us);
 }
@@ -166,8 +232,8 @@ static ucell_t *tuple_alloc(struct ulisp *u, size_t n) {
     ucell_t *tpl = umake_nil(u, TUPLE, n+1);
 
     if( !tpl ) {
-        // FIXME: ERROR: out of memory
-        return nil;
+        eval_error(u, ERR__EVAL_OOM, 0, "");
+        assert(0);
     }
 
     struct utuple *ttpl = utuple_val(tpl);
@@ -323,6 +389,8 @@ size_t ulisp_size() {
 
 struct ulisp *ulisp_create( void *mem
                           , size_t memsize
+                          , void *err_cc
+                          , ulisp_on_eval_error efn
                           , void *allocator
                           , alloc_function_t alloc
                           , dealloc_function_t dealloc ) {
@@ -336,6 +404,9 @@ struct ulisp *ulisp_create( void *mem
     memset(l, 0, ulisp_size());
 
     SET_ALLOCATOR(l, allocator, alloc, dealloc);
+
+    l->error_cc = err_cc;
+    l->error_fn = efn;
 
     const size_t BKT = 64;
     const size_t MINITEMS = 128;
@@ -465,8 +536,7 @@ static void ulisp_bind_one(struct ulisp *u, ucell_t *bind) {
     struct utuple *tpl = utuple_val(bind);
 
     if( !tpl ) {
-        // FIXME: error notification
-        fprintf(stderr, "*** error (init): bind must be a tuple\n");
+        eval_error(u, ERR__EVAL_TYPE, bind, "bind must be a tuple(string, expression)");
         assert(0);
     }
 
@@ -475,8 +545,7 @@ static void ulisp_bind_one(struct ulisp *u, ucell_t *bind) {
     ucell_t *value = utuple_get(u, bind, 1);
 
     if( !k ) {
-        // FIXME: error notification
-        fprintf(stderr, "*** error (init): bind key must be a string\n");
+        eval_error(u, ERR__EVAL_TYPE, bind, "bind must be a tuple(string, expression)");
         assert(0);
     }
 
@@ -762,10 +831,14 @@ static inline void ulisp_expr_typecheck( struct ulisp *u, ucell_type tp, ucell_t
         return;
     }
 
-    // FIXME: error handling
-    fprintf(stderr, "*** error (runtime): type error %s ~ %s\n"
-                  , ulisp_typename(u,expr)
-                  , ucell_typename(tp));
+    char tmp[256];
+    snprintf( tmp
+            , sizeof(tmp)
+            , "expected type %s, got %s"
+            , ucell_typename(tp)
+            , ucell_typename(tp));
+
+    eval_error_typecheck(u, expr, tp, expr);
     assert(0);
 }
 
@@ -779,16 +852,13 @@ static inline ucell_t *apply_list( struct ulisp *u, ucell_t *expr) {
     ucell_t *args = cdr(expr);
 
     if( isnil(appl) ) {
-        // FIXME: error
-        fprintf(stderr, "*** error (runtime): can't apply nil\n");
+        eval_error_application(u, expr, 0);
         assert(0);
     }
 
-
     if( appl->tp != CLOSURE ) {
         if( !isnil(args) ) {
-            // FIXME: error
-            fprintf(stderr, "*** error (runtime): bad application (%s)\n", ulisp_typename(u,appl));
+            eval_error_application(u, expr, &appl->tp);
             assert(0);
         }
         return appl;
@@ -820,8 +890,7 @@ static inline ucell_t *apply_list( struct ulisp *u, ucell_t *expr) {
 
     int ar1 = i-1 + (isnil(arg) ? 0 : 1);
     if( ar1 != ar ) {
-        // FIXME: error handling or ... ?
-        fprintf(stderr, "*** error (runtime): call arity mismatch %d ~ %d\n", ar, ar1 );
+        eval_error_arity(u, appl, ar, ar1);
         assert(0);
     }
 
@@ -836,23 +905,20 @@ static inline ucell_t *apply_list( struct ulisp *u, ucell_t *expr) {
         GENERATE_PRIMOP_CALL(ULISP_PRIMOP_MAX_ARITY, call);
     }
 
-    // FIXME: error handling
-    fprintf(stderr, "*** error (runtime): unsupported application of %s\n"
-                  , ulisp_typename(u,fun));
+    eval_error_application(u, expr, &fun->tp);
     assert(0);
 }
 
 ucell_t *ulisp_eval_expr( struct ulisp *u, ucell_t *expr ) {
 
-    if( isnil(expr) )
+    if( isnil(expr) || u->errors )
         return nil;
 
     switch( expr->tp ) {
         case ATOM: {
             ucell_t *e = udict_lookup(u, expr);
             if( isnil(e) ) {
-                // FIXME: error handling
-                fprintf(stderr, "*** error (runtime): unbound symbol %s\n", ustring_cstr(expr));
+                eval_error_unbound(u, expr);
                 assert(0);
             }
             return e;
@@ -878,18 +944,36 @@ void ulisp_eval_top( struct ulisp *u, struct ucell *top ) {
 
     ucell_t *expr = top;
 
-    for( ; expr; expr = cdr(expr) ) {
+    for( ; !u->errors && expr; expr = cdr(expr) ) {
 
         if( isnil(car(expr)) || car(expr)->tp != CONS ) {
-            // FIXME: normal error notification
-            // FIXME: stop on error?
-            // FIXME: line number (???)
-            fprintf(stderr, "*** error (eval): invalid top-level construct as line ()\n");
-            continue;
+            eval_error_toplevel_syntax(u, expr);
+            assert(0);
         }
 
         (void)ulisp_eval_expr(u, car(expr));
     }
+}
+
+const char *ulisp_eval_err_str(ulisp_eval_err err) {
+    switch(err) {
+        case ERR__EVAL_TYPE:
+            return "type";
+
+        case ERR__EVAL_ARITY:
+            return "bad arity";
+
+        case ERR__EVAL_OOM:
+            return "out of memory";
+
+        case ERR__EVAL_UNBOUND:
+            return "symbol not bound";
+
+        case ERR__EVAL_INTERNAL:
+            return "internal";
+    }
+
+    return "unknown";
 }
 
 const char *ulisp_parse_err_str(ulisp_parser_err err) {
@@ -902,6 +986,7 @@ const char *ulisp_parse_err_str(ulisp_parser_err err) {
             return "unknown parse error";
     }
 }
+
 
 const char *ucell_typename( ucell_type tp ) {
     switch( tp ) {

@@ -5,10 +5,28 @@
 #include "ulisp_bind.h"
 #include "exp_tokenize.h"
 
+typedef enum {
+      ERR__EVAL_TYPE
+    , ERR__EVAL_ARITY
+    , ERR__EVAL_OOM
+    , ERR__EVAL_UNBOUND
+    , ERR__EVAL_INTERNAL
+} ulisp_eval_err;
+
+typedef enum {
+    ERR__UNBALANCED_PAREN
+  , ERR__INVALID_TOKEN
+} ulisp_parser_err;
+
 size_t ulisp_size();
+
+typedef void* eval_context;
+typedef void (*ulisp_on_eval_error)(void*,ulisp_eval_err,eval_context,const char *);
 
 struct ulisp *ulisp_create( void *mem
                           , size_t memsize
+                          , void *err_cc
+                          , ulisp_on_eval_error
                           , void *allocator
                           , alloc_function_t alloc
                           , dealloc_function_t dealloc );
@@ -20,10 +38,6 @@ void ulisp_bind(struct ulisp *u, ucell_t *bindlist);
 struct ulisp_parser;
 size_t ulisp_parser_size();
 
-typedef enum {
-    ERR__UNBALANCED_PAREN
-  , ERR__INVALID_TOKEN
-} ulisp_parser_err;
 
 typedef void (*ulisp_parser_err_fn)(void *cc, ulisp_parser_err err, size_t lno, const char *misc);
 
@@ -47,6 +61,7 @@ void ulisp_parser_destroy( struct ulisp_parser *p );
 
 void ulisp_eval_top( struct ulisp *u, struct ucell *top );
 ucell_t *ulisp_eval_expr( struct ulisp *u, ucell_t *expr );
+const char *ulisp_eval_err_str(ulisp_eval_err err);
 
 struct ucell *umake(struct ulisp *u, ucell_type tp, size_t n, ...);
 

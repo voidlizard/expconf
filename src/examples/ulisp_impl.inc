@@ -8,10 +8,16 @@ struct ulisp {
 
     struct hash *dict;
 
+	// error handling
+	void *error_cc;
+	ulisp_on_eval_error error_fn;
+
     // allocator boilerplate
     void *allocator;
     alloc_function_t alloc;
     dealloc_function_t dealloc;
+
+	int errors;
 };
 
 struct ucell {
