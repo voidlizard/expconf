@@ -544,13 +544,6 @@ static inline void ulisp_expr_typecheck( struct ulisp *u, ucell_type tp, ucell_t
         return;
     }
 
-    char tmp[256];
-    snprintf( tmp
-            , sizeof(tmp)
-            , "expected type %s, got %s"
-            , ucell_typename(tp)
-            , ucell_typename(tp));
-
     eval_error_typecheck(u, expr, tp, expr);
     assert(0);
 }
