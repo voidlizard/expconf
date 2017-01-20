@@ -38,9 +38,6 @@ static inline void eval_error( struct ulisp *u
                              , ucell_t *e
                              , const char *msg ) {
 
-    void *ctx = 0; // TODO: extract context from e
-    u->errors++;
-
     ucell_t *wtf = ulisp_eval_expr(u, atom(u, "__UNIT__"));
 
     char tmp[ULISP_MAX_ERROR_MSG];
@@ -229,12 +226,6 @@ static inline ucell_t *utuple_get(struct ulisp *u, struct ucell *t, size_t i) {
     return i < tpl->len ? tpl->t[i] : nil;
 }
 
-static integer __list_length(ucell_t *e) {
-    integer l = 0;
-    for(; !isnil(e); e = cdr(e) ) l++;
-    return l;
-}
-
 static ucell_t *tuple_alloc(struct ulisp *u, size_t n) {
     ucell_t *tpl = umake_nil(u, TUPLE, n+1);
 
@@ -290,7 +281,7 @@ const char *ustring_cstr(struct ucell *us) {
 
 static uint32_t __pustring_hash(void *a) {
     struct ucell *k = *(struct ucell**)a;
-    return hash_murmur3_32(ustring_cstr(k), ustring_length(k), 0x00BEEF);
+    return hash_murmur3_32((unsigned char*)ustring_cstr(k), ustring_length(k), 0x00BEEF);
 }
 
 static bool __pustring_eq(void *a, void *b) {
@@ -320,7 +311,6 @@ static bool __udict_key_cmp(void *a, void *b) {
 }
 
 static void __udict_key_cpy(void *a, void *b) {
-    struct udict_key *k = b;
     memcpy(a, b, sizeof(struct udict_key));
 }
 
@@ -483,15 +473,8 @@ void ulisp_destroy( struct ulisp *l ) {
 }
 
 static void __dict_alter_value( void *cc, void *k_, void *v, bool n ) {
-    struct udict_key *k = k_;
     *(struct ucell**)v = *(struct ucell**)cc;
     __udict_val_cpy(v, cc);
-}
-
-static void __debug_dump_dict(void *cc, void *k_, void *v_) {
-    struct udict_key *k = k_;
-    struct ucell **v = v_;
-    fprintf(stderr, "dict entry %p %p\n", k->p, *v);
 }
 
 static void ulisp_bind_one(struct ulisp *u, ucell_t *bind) {
@@ -719,6 +702,7 @@ const char *ucell_typename( ucell_type tp ) {
         case PRIMOP: return "PRIMOP";
         case CLOSURE: return "CLOSURE";
         case OBJECT: return "OBJECT";
+        case ANY: return "ANY";
     }
 
     assert(0);

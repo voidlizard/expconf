@@ -28,18 +28,18 @@ struct ulisp_parser *ulisp_parser_create( void *mem
     }
 
     struct ulisp_parser *p = mem;
-    *p = (struct ulisp_parser) { .readfn = rfn
-                               , .allocator = allocator
-                               , .alloc = alloc
-                               , .dealloc = dealloc
-                               , .u = u
-                               , .token = { 0 }
-                               , .tokenizer = 0
-                               , .rdr = { 0 }
-                               , .on_err_cc = efn_cc
-                               , .on_err = efn
-                               , .errors = 0
-                               };
+    *p = (struct ulisp_parser){ .readfn = rfn
+                              , .allocator = allocator
+                              , .alloc = alloc
+                              , .dealloc = dealloc
+                              , .u = u
+                              , .token = { 0 }
+                              , .tokenizer = 0
+                              , .rdr = { 0 }
+                              , .on_err_cc = efn_cc
+                              , .on_err = efn
+                              , .errors = 0
+                              };
 
 
     p->rdr.lno = 1;

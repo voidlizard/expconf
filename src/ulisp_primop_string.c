@@ -21,7 +21,6 @@ static size_t strlist_length(void *rd_) {
 
     size_t len = 0;
     ucell_t *o = rd->head;
-    ucell_t *s = nil;
     for(; o; o = cdr(o) ) {
 
         ucell_t *s = car(o);

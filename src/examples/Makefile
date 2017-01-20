@@ -3,7 +3,8 @@ INCDIRS+=.
 
 include $(TOP)/make/top.mk
 
-# CFLAGS+=-c99
+CFLAGS+=-Wall
+
 
 MISCDATA_DIR:=$(TOP)/../../miscdata
 CHAOS_PP_DIR:=$(TOP)/../contrib/chaos-pp

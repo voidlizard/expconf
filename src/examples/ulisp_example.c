@@ -9,30 +9,6 @@
 #include "static_mem_pool.h"
 #include "examples_common.h"
 
-void print_nil( void *cc ) {
-    fprintf(stdout, "#nil");
-}
-
-void print_int( void *cc, integer v ) {
-    fprintf(stdout, "%ld ", v);
-}
-
-void print_str(void *cc, size_t len, const char *s) {
-    fprintf(stdout, "\"%s\" ", s);
-}
-
-void print_atom(void *cc, size_t len, const char *s) {
-    fprintf(stdout, "%s ", s);
-}
-
-void print_list_start( void *cc ) {
-    fprintf(stdout, "(cons ");
-}
-
-void print_list_end( void *cc ) {
-    fprintf(stdout, ") ");
-}
-
 static void show_parse_error( void *cc
                             , ulisp_parser_err err
                             , eval_context ectx
@@ -49,15 +25,6 @@ static void on_eval_error( void *cc
     const char *ctx = ectx;
     fprintf(stderr, "%s error: (eval, %s) : %s\n", ctx, ulisp_eval_err_str(err), msg);
 }
-
-static struct ucell_walk_cb walk_cb = { .cc = 0
-                                      , .on_list_start = print_list_start
-                                      , .on_list_end   = print_list_end
-                                      , .on_integer    = print_int
-                                      , .on_atom       = print_atom
-                                      , .on_string     = print_str
-                                      , .on_nil        = print_nil
-                                      };
 
 static ucellp_t getenv_safe(object u, cstr name) {
     char *env = getenv((char*)name);
@@ -142,7 +109,7 @@ int main(int argc, char *argv[]) {
                                    , &env
                                    , 0
                                    , on_eval_error
-                                   , &pool
+                                   , pp
                                    , static_mem_pool_alloc
                                    , static_mem_pool_dealloc
                                    );
@@ -154,7 +121,7 @@ int main(int argc, char *argv[]) {
             list(u, bind(u, "println",  closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln)), 0))
                           , bind(u, "println2", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 1, cstring(u,"FREE1 ")))
                           , bind(u, "println3", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 0))
-                          , bind(u, "println4", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 2, cstring(u,"A"), cstring(u,"B")))
+                          , bind(u, "println4", closure(u, primop(u, &ULISP_PRIMOP_VAR(print_strln2)), 2, cstring(u,"A"), cstring(u,"D")))
     /*                      , bind(u, "getenv",   closure(u, primop(u, &ULISP_PRIMOP_VAR(getenv_safe)), 1, object(u,u)))*/
                           , bind(u, "getenv",   closure(u, primop(u, &ULISP_PRIMOP_VAR(getenv)), 0))
                           , bind(u, "display",  closure(u, primop(u, &ULISP_PRIMOP_VAR(display)), 1, object(u,u)))
@@ -199,7 +166,7 @@ _fin:
 
     if( u ) ulisp_destroy(u);
     if( file) fclose(file);
-    static_mem_pool_destroy(&pool);
+    static_mem_pool_destroy(pp);
 
     return !errors ? 0 : -1;
 }

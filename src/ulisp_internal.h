@@ -17,7 +17,6 @@ struct ulisp {
     alloc_function_t alloc;
     dealloc_function_t dealloc;
 
-	int errors;
     jmp_buf *abrt;
 };
 

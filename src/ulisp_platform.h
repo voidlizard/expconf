@@ -13,4 +13,5 @@
 #define ULISP_ATOM_MAX 255
 #define ULISP_MAX_ERROR_MSG (FILENAME_MAX+32)
 
+
 #endif
