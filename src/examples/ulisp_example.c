@@ -5,6 +5,7 @@
 #include "ulisp.h"
 #include "ulisp_primop_string.h"
 #include "ulisp_bind.h"
+#include "ulisp_parser.h"
 #include "static_mem_pool.h"
 #include "examples_common.h"
 

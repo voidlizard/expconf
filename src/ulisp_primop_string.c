@@ -1,5 +1,5 @@
 #include "ulisp.h"
-#include "ulisp_impl.inc"
+#include "ulisp_internal.h"
 #include "ulisp_primop_string.h"
 
 struct strlist_reader {

@@ -24,5 +24,6 @@ typedef struct ucell ucell_t;
 typedef ucell_t* ucellp_t;
 typedef struct utuple utuple_t;
 typedef void* object;
+typedef void* eval_context;
 
 #endif

@@ -17,15 +17,13 @@ EXPCONF_DIR:=..
 EXPCONF_SOURCES+= expconf.c
 EXPCONF_SOURCES+= exp_tokenize.c
 EXPCONF_SOURCES+= strchunk.c
+EXPCONF_SOURCES+=$(ULISP_SOURCES)
 
-ULISP_SOURCES+=ulisp.c ulisp_primop_string.c
-EX_BIND_SOURCES+=ex_bind.c
+ULISP_SOURCES+=ulisp.c ulisp_parser.c ulisp_primop_string.c
 
 EXAMPLES_COMMON_SOURCES+=examples_common.c
 
-TOKENIZE_SOURCES+=tokenize.c $(EXAMPLES_COMMON_SOURCES)
-PARSE1_SOURCES+=parse1.c $(EXAMPLES_COMMON_SOURCES)
-UCLISP_SOURCES+=ulisp_example.c $(ULISP_SOURCES) $(EXAMPLES_COMMON_SOURCES)
+ULISP_EXAMPLE_SOURCES+=ulisp_example.c $(ULISP_SOURCES) $(EXAMPLES_COMMON_SOURCES)
 
 $(eval $(call add_include_dir, $(MISCDATA_DIR)))
 $(eval $(call add_include_dir, $(CHAOS_PP_DIR)))
@@ -34,10 +32,7 @@ $(eval $(call miscdata_sources, $(MISCDATA_SOURCES)))
 $(eval $(call add_include_dir, $(EXPCONF_DIR)))
 $(eval $(call add_source_dir,  $(EXPCONF_DIR), $(EXPCONF_SOURCES)))
 
-$(eval $(call ExecFile,tokenize, $(TOKENIZE_SOURCES) $(ALLSOURCES)))
-$(eval $(call ExecFile,parse1, $(PARSE1_SOURCES) $(ALLSOURCES)))
-$(eval $(call ExecFile,ulisp_example, $(UCLISP_SOURCES) $(ALLSOURCES)))
-#$(eval $(call ExecFile,ex_bind, $(EX_BIND_SOURCES) $(ALLSOURCES)))
+$(eval $(call ExecFile,ulisp_example, $(ULISP_EXAMPLE_SOURCES) $(ALLSOURCES)))
 
 all: $(ALLEXECUTABLES)
 
