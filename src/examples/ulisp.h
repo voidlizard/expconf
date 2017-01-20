@@ -61,6 +61,7 @@ const char *ustring_cstr(struct ucell *us);
 const char *ucell_typename( ucell_type tp );
 const char *ulisp_typename( struct ulisp *u, ucell_t *cell );
 
+bool ucell_is_string(ucell_t *s);
 ucellp_t ucell_to_string(struct ulisp *, ucellp_t);
 
 integer ucell_intval(struct ucell *us);
@@ -70,6 +71,8 @@ object ucell_object(ucell_t *us);
 #define isnil(c) ((c) == nil)
 
 #define ornil(v,e) ((v)?(e):nil)
+
+#define QUOTE(u) atom((u), "quote")
 
 #define cstring(u, s) \
 ornil((s),umake_stringlike((u), STRING, mk_cstring_reader(pstacktmp(struct cstring_reader), (char*)(s)), true))
@@ -85,6 +88,7 @@ ornil((s),umake_stringlike((u), ATOM, mk_cstring_reader(pstacktmp(struct cstring
 
 #define integer(u, i) umake((u), INTEGER, 1, (struct ucell*)(i))
 #define cons(u, a, b) umake((u), CONS, 2, (a), (b))
+#define quote(u, e) cons((u), QUOTE((u)), cons((u),(e),nil))
 
 #define bind(u,n,what) tuple((u), 2, atom((u), (n)), (what))
 
@@ -92,6 +96,7 @@ ornil((s),umake_stringlike((u), ATOM, mk_cstring_reader(pstacktmp(struct cstring
 
 #define primop(u, op) umake((u), PRIMOP, 1, (op))
 #define object(u, obj) umake((u), OBJECT, 1, (obj))
+
 
 struct ulisp_primop *ucell_primop(ucell_t *e);
 

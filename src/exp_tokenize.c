@@ -132,7 +132,7 @@ static bool is_space_but_newline(void *c, unsigned char chr) {
 }
 
 static bool is_punct(void *c, unsigned char chr) {
-    return !!strchr(".();,", (int)chr);
+    return !!strchr(".();,\"':", (int)chr);
 }
 
 static bool is_line_comment(void *c, unsigned char chr) {
@@ -253,6 +253,8 @@ static void emit_token( struct exp_tokenizer *t
         case TOK_OPAREN:
         case TOK_CPAREN:
         case TOK_COMMA:
+        case TOK_DOT:
+        case TOK_SQUOT:
         case TOK_SEMI:
         case TOK_NEWLINE:
             break;
@@ -456,6 +458,16 @@ struct exp_token * exp_tokenizer_next( struct exp_tokenizer *t
             return tok;
         }
 
+        if( *pc == '.' ) {
+            emit_token(t, TOK_DOT, 0, tok);
+            return tok;
+        }
+
+        if( *pc == '\'' ) {
+            emit_token(t, TOK_SQUOT, 0, tok);
+            return tok;
+        }
+
         if( is_dec_digit(0, *pc) ) {
 
             integer_init(t, 10);
@@ -535,6 +547,10 @@ const char *exp_token_tag_name(exp_token_tag tag) {
             return "ERROR";
         case TOK_COMMA:
             return "TOK_COMMA";
+        case TOK_SQUOT:
+            return "TOK_SQUOT";
+        case TOK_DOT:
+            return "TOK_DOT";
         case TOK_SEMI:
             return "TOK_SEMI";
         case TOK_NEWLINE:

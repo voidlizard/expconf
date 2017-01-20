@@ -18,7 +18,7 @@ EXPCONF_SOURCES+= expconf.c
 EXPCONF_SOURCES+= exp_tokenize.c
 EXPCONF_SOURCES+= strchunk.c
 
-ULISP_SOURCES+=ulisp.c
+ULISP_SOURCES+=ulisp.c ulisp_primop_string.c
 EX_BIND_SOURCES+=ex_bind.c
 
 EXAMPLES_COMMON_SOURCES+=examples_common.c

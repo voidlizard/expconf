@@ -3,6 +3,7 @@
 #include <errno.h>
 
 #include "ulisp.h"
+#include "ulisp_primop_string.h"
 #include "ulisp_bind.h"
 #include "static_mem_pool.h"
 #include "examples_common.h"
@@ -48,20 +49,6 @@ static struct ucell_walk_cb walk_cb = { .cc = 0
                                       , .on_string     = print_str
                                       , .on_nil        = print_nil
                                       };
-
-static ucell_t *__display( struct ulisp *u, ucell_t *op, ucell_t *rs ) {
-    fprintf(stdout, "%s\n", ustring_cstr(rs));
-    return nil;
-}
-
-
-static struct ulisp_primop  __primop_display = { .arity = 1
-                                               , .callee = 0
-                                               , .wrapper = __display
-                                               , .tp = UNIT
-                                               , .argtp = { STRING }
-                                               };
-
 
 static ucellp_t getenv_safe(object u, cstr name) {
     char *env = getenv((char*)name);

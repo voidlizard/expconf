@@ -8,10 +8,7 @@
 #include "hashfun_murmur.h"
 #include "stringlike.h"
 
-#define setcar(cell, v) (cell)->data[0] = (v)
-#define setcdr(cell, v) (cell)->data[1] = (v)
-#define car(cell) (cell)->data[0]
-#define cdr(cell) (cell)->data[1]
+#include "ulisp_impl.inc"
 
 #define ucell_int(cell) ((integer)car((cell)))
 
@@ -21,23 +18,6 @@ umake_stringlike((u), STRING, mk_strchunk_reader(pstacktmp(struct strchunk_reade
 #define atom_tok(u, s) \
 umake_stringlike((u), ATOM, mk_strchunk_reader(pstacktmp(struct strchunk_reader), (s)), true)
 
-struct ulisp {
-
-    // FIXME: remove obsolete
-    struct hash *hstr;
-
-    struct hash *dict;
-
-    // allocator boilerplate
-    void *allocator;
-    alloc_function_t alloc;
-    dealloc_function_t dealloc;
-};
-
-struct ucell {
-    ucell_type tp;
-    struct ucell *data[1];
-};
 
 struct ustring {
     size_t len;
@@ -688,15 +668,21 @@ static struct ucell *parse_expr( struct ulisp_parser *p, struct ucell *top ) {
                 p->on_err(p->on_err_cc, ERR__UNBALANCED_PAREN, p->rdr.lno, "");
                 return nil;
 
-            case TOK_ERROR:
-                p->on_err(p->on_err_cc, ERR__INVALID_TOKEN, p->rdr.lno, "");
-                return nil;
+            case TOK_SQUOT:
+                return quote(u, parse_expr(p, top));
+
+            case TOK_DOT:
+                return atom(u, ",");
 
             case TOK_COMMA:
                 return atom(u, ",");
 
             case TOK_SEMI:
                 return atom(u, ";");
+
+            case TOK_ERROR:
+                p->on_err(p->on_err_cc, ERR__INVALID_TOKEN, p->rdr.lno, "");
+                return nil;
 
             default:
                 assert(0);
@@ -791,6 +777,10 @@ static inline void ulisp_expr_typecheck( struct ulisp *u, ucell_type tp, ucell_t
 
 static inline ucell_t *apply_list( struct ulisp *u, ucell_t *expr) {
 
+    if( car(expr) == QUOTE(u) ) {
+        return car(cdr(expr));
+    }
+
     ucell_t *appl = ulisp_eval_expr(u, car(expr));
     ucell_t *args = cdr(expr);
 
@@ -799,6 +789,7 @@ static inline ucell_t *apply_list( struct ulisp *u, ucell_t *expr) {
         fprintf(stderr, "*** error (runtime): can't apply nil\n");
         assert(0);
     }
+
 
     if( appl->tp != CLOSURE ) {
         if( !isnil(args) ) {
@@ -942,53 +933,10 @@ const char *ulisp_typename( struct ulisp *u, ucell_t *cell ) {
     return ucell_typename(cell->tp);
 }
 
-ucellp_t ucell_to_string(struct ulisp *u, ucellp_t expr) {
+bool ucell_is_string(ucell_t *s) {
+    if( isnil(s) )
+        return false;
 
-    if( isnil(expr) ) {
-        return cstring(u,"(#nil)");
-    }
-
-    switch( expr->tp ) {
-        case UNIT:
-            return cstring(u,"(#unit)");
-
-        case CONS:
-            return cstring(u,"(#cons...)");
-
-        case INTEGER: {
-            char tmp[256];
-            snprintf(tmp, sizeof(tmp), "%ld", ucell_intval(expr));
-            return cstring_(u,tmp);
-        }
-
-        case ATOM:
-            return expr;
-
-        case STRING:
-            return expr;
-
-        case TUPLE:
-            return cstring(u,"(#tuple)");
-
-        case CLOSURE: {
-            char tmp[256];
-            snprintf(tmp, sizeof(tmp), "(#closure %p)", car(expr));
-            return cstring_(u,tmp);
-        }
-
-        case PRIMOP: {
-            char tmp[256];
-            snprintf(tmp, sizeof(tmp), "(#primop %p)", ucell_primop(expr));
-            return cstring_(u, tmp);
-        }
-
-        case OBJECT:
-            return cstring(u,"(#object)");
-
-        default:
-            return cstring(u, "(#unknown-object)");
-    }
+    return s->tp == ATOM || s->tp == STRING;
 
 }
-
-

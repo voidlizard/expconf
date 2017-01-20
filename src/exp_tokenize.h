@@ -28,6 +28,8 @@ void exp_tokenizer_destroy( struct exp_tokenizer** );
 typedef enum {
     TOK_ERROR
   , TOK_COMMA
+  , TOK_SQUOT
+  , TOK_DOT
   , TOK_SEMI
   , TOK_NEWLINE
   , TOK_OPAREN
