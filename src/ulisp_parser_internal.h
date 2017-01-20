@@ -30,8 +30,10 @@ struct ulisp_parser {
 };
 
 static inline ucell_t *setlno(struct ulisp_parser *p, ucell_t *cell) {
-	cell->lno = p->rdr.lno;
-	return cell;
+    if( !isnil(cell) ) {
+        cell->lno = p->rdr.lno;
+    }
+    return cell;
 }
 
 #endif

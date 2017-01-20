@@ -160,7 +160,7 @@ ucellp_t ucell_to_string(struct ulisp *u, ucellp_t expr) {
     char tmp256[256];
 
     if( isnil(expr) ) {
-        return cstring(u,"(#nil)");
+        return cstring(u,"()");
     }
 
     switch( expr->tp ) {
