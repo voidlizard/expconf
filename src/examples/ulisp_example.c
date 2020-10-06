@@ -53,6 +53,12 @@ static void display(object u_, ucellp_t what) {
     fprintf(stdout, "%s", ustring_cstr(ucell_to_string(u_, what)));
 }
 
+
+static int sumlist(object u_, ucellp_t what) {
+    fprintf(stderr, "I'm a sumlist function %p %s\n", what, ustring_cstr(ucell_to_string(u_, what)));
+    return 0;
+}
+
 static void newline() {
     fprintf(stdout, "\n");
 }
@@ -70,6 +76,7 @@ ULISP_PRIMOP(display, void, object, ucellp_t)
 ULISP_PRIMOP(newline, void)
 ULISP_PRIMOP(getenv_safe, ucellp_t, object, cstr)
 ULISP_PRIMOP(getenv, cstr, cstr) // from stdlib.h !
+ULISP_PRIMOP(sumlist, int, object, ucellp_t)
 
 int main(int argc, char *argv[]) {
 
@@ -128,6 +135,7 @@ int main(int argc, char *argv[]) {
                           , bind(u, "newline",  closure(u, primop(u, &ULISP_PRIMOP_VAR(newline)), 0))
                           , bind(u, "succ",     closure(u, primop(u, &ULISP_PRIMOP_VAR(succ)), 0))
                           , bind(u, "+",        closure(u, primop(u, &ULISP_PRIMOP_VAR(sum)), 0))
+                          , bind(u, "++",       closure(u, primop_l(u, &ULISP_PRIMOP_VAR(sumlist)), 1, object(u,u)))
                           , bind(u, "__VERSION__", cstring(u, "ulisp-0.1-alpha"))
                           , bind(u, "__UNIT__", cstring(u, fname))
                           , nil);

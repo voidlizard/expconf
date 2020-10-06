@@ -81,6 +81,7 @@ ornil((s),umake_stringlike((u), ATOM, mk_cstring_reader(pstacktmp(struct cstring
 #define closure(u, code, n, ...) umake((u), CLOSURE, 1, tuple((u), (n)+1, code, ##__VA_ARGS__))
 
 #define primop(u, op) umake((u), PRIMOP, 1, (op))
+#define primop_l(u, op) umake((u), PRIMOP_LIST, 1, (op))
 #define object(u, obj) umake((u), OBJECT, 1, (obj))
 
 

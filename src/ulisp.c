@@ -116,7 +116,7 @@ object ucell_object(ucell_t *us) {
 }
 
 struct ulisp_primop *ucell_primop(ucell_t *e) {
-    return (!isnil(e) && e->tp == PRIMOP) ? (void*)e->data[0] : 0;
+    return (!isnil(e) && ((e->tp == PRIMOP) || (e->tp == PRIMOP_LIST))) ? (void*)e->data[0] : 0;
 }
 
 static struct ucell *ucell_alloc(struct ulisp *u, size_t bytes) {
@@ -518,6 +518,11 @@ static inline int arity(struct ulisp *u, struct ucell *expr) {
             return op ? op->arity : 0;
         }
 
+        case PRIMOP_LIST: {
+            struct ulisp_primop *op = ucell_primop(expr);
+            return op ? op->arity : 0;
+        }
+
         case CLOSURE: {
             ucell_t *tpl = car(expr);
             // FIXME: error handle?
@@ -585,23 +590,24 @@ static inline ucell_t *apply_list( struct ulisp *u, ucell_t *expr) {
 
     utuple_set(u, call, 0, fun);
 
-    int i = 1;
-    for(; i <= freevars; i++ ) {
+    int i = 1, j = 0;
+    for(; i <= freevars; i++, j++ ) {
         utuple_set(u, call, i, utuple_get(u, tuple, i));
     }
 
     ucell_t *arg = args;
-    for(; i <= ar && !isnil(arg); arg = cdr(arg), i++ ) {
-        utuple_set(u, call, i, ulisp_eval_expr(u, car(arg)));
-    }
-
     int ar1 = i-1 + (isnil(arg) ? 0 : 1);
-    if( ar1 != ar ) {
-        eval_error_arity(u, appl, ar, ar1);
-        assert(0);
-    }
 
     if( fun->tp == PRIMOP ) {
+
+        for(; i <= ar && !isnil(arg); arg = cdr(arg), i++ ) {
+            utuple_set(u, call, i, ulisp_eval_expr(u, car(arg)));
+        }
+
+        if( ar1 != ar ) {
+            eval_error_arity(u, appl, ar, ar1);
+            assert(0);
+        }
 
         int j = 1;
         struct ulisp_primop *op = ucell_primop(fun);
@@ -610,6 +616,23 @@ static inline ucell_t *apply_list( struct ulisp *u, ucell_t *expr) {
         }
 
         GENERATE_PRIMOP_CALL(ULISP_PRIMOP_MAX_ARITY, call);
+    } else if( fun->tp == PRIMOP_LIST ) {
+        if( ar != freevars + 1) {
+            eval_error_arity(u, appl, freevars+1, ar);
+            assert(0);
+        }
+        ucell_t *result = nil;
+        for(; !isnil(arg); arg = cdr(arg), i++ ) {
+            result = cons(u, ulisp_eval_expr(u, car(arg)), result);
+        }
+        ucell_t *ev = result;
+        ucell_t *to = nil;
+        for(; !isnil(ev); ev = cdr(ev) ) {
+            to = cons(u, car(ev), to);
+        }
+        utuple_set(u, call, freevars+1, to);
+        GENERATE_PRIMOP_CALL(ULISP_PRIMOP_MAX_ARITY, call);
+        assert(0);
     }
 
     eval_error_application(u, expr, &fun->tp);
@@ -694,6 +717,7 @@ const char *ucell_typename( ucell_type tp ) {
         case STRING: return "STRING";
         case TUPLE: return "TUPLE";
         case PRIMOP: return "PRIMOP";
+        case PRIMOP_LIST: return "PRIMOP";
         case CLOSURE: return "CLOSURE";
         case OBJECT: return "OBJECT";
         case ANY: return "ANY";

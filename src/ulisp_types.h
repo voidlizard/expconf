@@ -12,6 +12,7 @@ typedef enum {
    , TUPLE
    , CLOSURE
    , PRIMOP
+   , PRIMOP_LIST
    , ANY
    , OBJECT
 } ucell_type;
